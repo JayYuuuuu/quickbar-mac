@@ -100,6 +100,7 @@ final class QuickBarPanel: NSPanel {
         filterBox.heightAnchor.constraint(equalToConstant: 27).isActive = true
         filterIcon.widthAnchor.constraint(equalToConstant: 12).isActive = true
 
+        filterBox.toolTip = "支持拼音：「下载」可以输 xiazai，也可以只输首字母 xz。"
         let filterRow = NSStackView(views: [filterBox])
         filterRow.orientation = .horizontal
         filterRow.edgeInsets = NSEdgeInsets(top: 0, left: 9, bottom: 4, right: 9)
@@ -221,9 +222,6 @@ final class QuickBarPanel: NSPanel {
     private func buildEntries() {
         let store = Store.shared
         let needle = filter.lowercased()
-        func matches(_ item: QuickItem) -> Bool {
-            needle.isEmpty || item.name.lowercased().contains(needle) || item.path.lowercased().contains(needle)
-        }
 
         entries = []
 
@@ -232,19 +230,35 @@ final class QuickBarPanel: NSPanel {
             var pinned = QuickItem(kind: .folder, name: FinderService.shared.currentName,
                                    path: FinderService.shared.currentPath)
             pinned.id = UUID()
-            if matches(pinned) { entries.append(.item(pinned, pinned: true)) }
+            if Pinyin.score(name: pinned.name, path: pinned.path, needle: needle) != nil {
+                entries.append(.item(pinned, pinned: true))
+            }
         }
 
-        let folders = store.folders.filter(matches)
+        let folders = rank(store.folders, needle: needle)
         if !folders.isEmpty {
             entries.append(.header("文件夹"))
             entries.append(contentsOf: folders.map { .item($0, pinned: false) })
         }
-        let apps = store.apps.filter(matches)
+        let apps = rank(store.apps, needle: needle)
         if !apps.isEmpty {
             entries.append(.header("应用"))
             entries.append(contentsOf: apps.map { .item($0, pinned: false) })
         }
+        if entries.isEmpty { entries.append(.header("没有匹配项")) }
+    }
+
+    /// 没有筛选词时保持用户自己排的顺序；一旦开始筛选，就按贴切程度重排。
+    private func rank(_ items: [QuickItem], needle: String) -> [QuickItem] {
+        guard !needle.isEmpty else { return items }
+        return items.enumerated()
+            .compactMap { index, item -> (QuickItem, Int, Int)? in
+                guard let score = Pinyin.score(name: item.name, path: item.path, needle: needle) else { return nil }
+                return (item, score, index)
+            }
+            // 同分时按原顺序，Swift 的 sorted 不保证稳定，所以显式拿下标兜底
+            .sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.2 < $1.2 }
+            .map(\.0)
     }
 
     private func rebuildRows() {

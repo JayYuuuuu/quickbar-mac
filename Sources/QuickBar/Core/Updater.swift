@@ -26,8 +26,13 @@ final class Updater {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     }
 
+    /// 本地构建（0.0.0-dev）不参与自动更新。
+    /// 否则装上开发版试跑，30 秒后就被线上正式版悄悄换掉了——
+    /// 表现是「代码明明改了，跑起来还是旧行为」，非常难查。
+    var isDevelopmentBuild: Bool { currentVersion.contains("dev") }
+
     func startScheduledChecks() {
-        guard Store.shared.settings.autoUpdate else { return }
+        guard Store.shared.settings.autoUpdate, !isDevelopmentBuild else { return }
         // 开机自启时别和登录风暴抢资源，等 30 秒再说。
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
             self?.check(userInitiated: false)
@@ -46,7 +51,7 @@ final class Updater {
 
     func check(userInitiated: Bool) {
         guard !isBusy else { return }
-        guard userInitiated || Store.shared.settings.autoUpdate else { return }
+        guard userInitiated || (Store.shared.settings.autoUpdate && !isDevelopmentBuild) else { return }
         isBusy = true
         statusText = "正在检查更新…"
 
