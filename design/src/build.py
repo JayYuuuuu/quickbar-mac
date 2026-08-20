@@ -14,11 +14,14 @@ OUT = HERE.parent
 # 画板名、深色开关的默认值、画板尺寸
 SPECS = [
     ("Main", False, 720, 480),
+    ("Filter", True, 720, 480),
     ("Panel", True, 720, 480),
-    ("Settings", False, 760, 560),
-    ("Trigger", True, 760, 600),
     ("MenuBar", False, 560, 420),
     ("Onboarding", True, 560, 540),
+    ("Settings", False, 760, 560),
+    ("Trigger", True, 760, 520),
+    ("Permissions", False, 760, 440),
+    ("General", True, 760, 560),
 ]
 
 TEMPLATE = """<!doctype html>
