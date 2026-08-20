@@ -9,6 +9,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusItem.buttonItem()
     private let menu = NSMenu()
 
+    var onShowQuickBar: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onOpenPermissions: (() -> Void)?
     var onToggleTrigger: (() -> Void)?
@@ -24,6 +25,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+
+        menu.addItem(item("唤出快捷条", action: #selector(showQuickBar)))
 
         let paused = !EventTapService.shared.isRunning
         menu.addItem(item(paused ? "恢复触发" : "暂停触发", action: #selector(toggleTrigger)))
@@ -81,6 +84,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return image
     }
 
+    @objc private func showQuickBar() { onShowQuickBar?() }
     @objc private func toggleTrigger() { onToggleTrigger?() }
     @objc private func openSettings() { onOpenSettings?() }
     @objc private func openPermissions() { onOpenPermissions?() }

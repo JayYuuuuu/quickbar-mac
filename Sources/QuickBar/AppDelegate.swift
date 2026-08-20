@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quickBar = QuickBarPanel()
 
         menuBar = MenuBarController()
+        menuBar?.onShowQuickBar = { [weak self] in
+            // 菜单关掉之后再弹，否则菜单本身会立刻把 key window 抢回去。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self?.quickBar?.show() }
+        }
         menuBar?.onOpenSettings = { [weak self] in self?.showSettings(.items) }
         menuBar?.onOpenPermissions = { [weak self] in self?.showOnboarding() }
         menuBar?.onToggleTrigger = { [weak self] in self?.toggleTrigger() }

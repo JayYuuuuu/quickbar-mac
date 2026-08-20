@@ -34,6 +34,7 @@ final class QuickBarPanel: NSPanel {
     private var panelContext: DetectedPanel?
     private var iconCache: [String: NSImage] = [:]
     private var listHeightConstraint: NSLayoutConstraint!
+    private var contentListHeight: CGFloat = 0
 
     init() {
         super.init(
@@ -109,11 +110,20 @@ final class QuickBarPanel: NSPanel {
         listStack.spacing = 1
         listStack.alignment = .leading
         listStack.edgeInsets = NSEdgeInsets(top: 0, left: 7, bottom: 6, right: 7)
-        scrollView.documentView = listStack
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
+        scrollView.documentView = listStack
+        // documentView 必须显式钉到 clipView 上。少了这几条，
+        // listStack 宽度会是 0——行被压成零宽（看不见），窗口也没东西撑开宽度。
+        listStack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            listStack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            listStack.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            listStack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            listStack.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor)
+        ])
 
         // 底栏
         footerLeft.font = .systemFont(ofSize: 11)
@@ -144,7 +154,7 @@ final class QuickBarPanel: NSPanel {
             scrollView.widthAnchor.constraint(equalTo: root.widthAnchor),
             separator.widthAnchor.constraint(equalTo: root.widthAnchor),
             footer.widthAnchor.constraint(equalTo: root.widthAnchor),
-            listStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            effect.widthAnchor.constraint(equalToConstant: Self.panelWidth)
         ])
 
         // 只建一次，之后改 constant——每次 reload 新建约束会越堆越多然后互相打架
@@ -241,6 +251,8 @@ final class QuickBarPanel: NSPanel {
         listStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         rowViews = []
         selectableIndexes = []
+        contentListHeight = listStack.edgeInsets.top + listStack.edgeInsets.bottom
+        var pieces = 0
 
         for (index, entry) in entries.enumerated() {
             switch entry {
@@ -252,6 +264,8 @@ final class QuickBarPanel: NSPanel {
                 wrapper.edgeInsets = NSEdgeInsets(top: 8, left: 9, bottom: 3, right: 9)
                 listStack.addArrangedSubview(wrapper)
                 wrapper.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+                contentListHeight += 25
+                pieces += 1
 
             case .item(let item, let pinned):
                 let disabled = panelContext != nil && item.kind == .app
@@ -262,13 +276,17 @@ final class QuickBarPanel: NSPanel {
                     self.selection = position
                     self.updateSelection()
                 }
+                let height: CGFloat = pinned ? 34 : Self.rowHeight
                 listStack.addArrangedSubview(row)
                 row.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
-                row.heightAnchor.constraint(equalToConstant: pinned ? 34 : Self.rowHeight).isActive = true
+                row.heightAnchor.constraint(equalToConstant: height).isActive = true
                 rowViews.append(row)
+                contentListHeight += height
+                pieces += 1
                 if !disabled { selectableIndexes.append(index) }
             }
         }
+        contentListHeight += CGFloat(max(0, pieces - 1)) * listStack.spacing
         selection = min(selection, max(0, selectableIndexes.count - 1))
     }
 
@@ -300,10 +318,11 @@ final class QuickBarPanel: NSPanel {
     }
 
     private func resizeToFit() {
-        listStack.layoutSubtreeIfNeeded()
-        let listHeight = min(listStack.fittingSize.height, Self.maxListHeight)
-        listHeightConstraint.constant = listHeight
-        setContentSize(NSSize(width: Self.panelWidth, height: 42 + 31 + listHeight + 1 + 30))
+        listHeightConstraint.constant = min(contentListHeight, Self.maxListHeight)
+        effect.layoutSubtreeIfNeeded()
+        // 高度交给 Auto Layout 算，宽度由 effect 的固定约束定死。
+        let height = max(effect.fittingSize.height, 120)
+        setContentSize(NSSize(width: Self.panelWidth, height: height))
     }
 
     private func updateSelection() {

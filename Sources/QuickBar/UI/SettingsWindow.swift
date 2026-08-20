@@ -9,8 +9,7 @@ final class SettingsWindowController: NSWindowController {
         let hosting = NSHostingController(rootView: SettingsView(initialSection: section))
         let window = NSWindow(contentViewController: hosting)
         window.title = "QuickBar 设置"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = false
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 720, height: 520))
         window.minSize = NSSize(width: 640, height: 460)
         window.center()
@@ -58,22 +57,25 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsSection.allCases, selection: $section) { item in
-                Label {
-                    HStack(spacing: 6) {
-                        Text(item.title)
-                        if item == .permissions, !missingPermissions.isEmpty {
-                            Circle().fill(.orange).frame(width: 6, height: 6)
-                        }
-                    }
-                } icon: {
-                    Image(systemName: item.symbol)
+        HStack(spacing: 0) {
+            // 刻意不用 NavigationSplitView：它的侧边栏能拖到折叠，
+            // 而恢复它要靠「显示」菜单——后台程序没有菜单栏，折叠了就回不来了。
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(SettingsSection.allCases) { item in
+                    SidebarRow(
+                        section: item,
+                        selected: section == item,
+                        warning: item == .permissions && !missingPermissions.isEmpty
+                    ) { section = item }
                 }
-                .tag(item)
+                Spacer()
             }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 172, max: 200)
-        } detail: {
+            .padding(8)
+            .frame(width: 172)
+            .background(VisualEffect(material: .sidebar))
+
+            Divider()
+
             Group {
                 switch section {
                 case .items: ItemsPane(store: store)
@@ -87,6 +89,53 @@ struct SettingsView: View {
         .onReceive(heartbeat) { _ in
             missingPermissions = Permissions.Kind.allCases.filter { !Permissions.isGranted($0) }
         }
+    }
+}
+
+private struct SidebarRow: View {
+    let section: SettingsSection
+    let selected: Bool
+    let warning: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: section.symbol)
+                    .frame(width: 17)
+                Text(section.title)
+                Spacer()
+                if warning {
+                    Circle().fill(.orange).frame(width: 6, height: 6)
+                }
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(selected ? Color.accentColor : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 侧边栏那层材质，SwiftUI 没有等价物，包一下原生的。
+private struct VisualEffect: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
     }
 }
 
@@ -121,14 +170,24 @@ private struct ItemsPane: View {
             .listStyle(.inset)
 
             Divider()
-            HStack(spacing: 8) {
-                Button { addFolder() } label: { Image(systemName: "plus") }
-                    .help("添加文件夹")
-                Button { addApp() } label: { Image(systemName: "app.badge.checkmark") }
-                    .help("添加应用")
-                Button { removeSelected() } label: { Image(systemName: "minus") }
-                    .disabled(selection.isEmpty)
-                    .help("移除选中的条目")
+            HStack(spacing: 6) {
+                Menu {
+                    Button("添加文件夹…") { addFolder() }
+                    Button("添加应用…") { addApp() }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 30, height: 22)
+                .help("添加文件夹或应用")
+
+                Button { removeSelected() } label: {
+                    Image(systemName: "minus").frame(width: 30, height: 22)
+                }
+                .disabled(selection.isEmpty)
+                .help("移除选中的条目")
+
                 Spacer()
                 Text("也可以把文件夹或应用直接拖进来")
                     .font(.caption).foregroundStyle(.tertiary)

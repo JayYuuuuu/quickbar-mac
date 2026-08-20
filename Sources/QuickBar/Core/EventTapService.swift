@@ -22,6 +22,10 @@ final class EventTapService {
     private var thread: Thread?
     private var watchdog: Timer?
 
+    /// 吞掉了触发用的那次 mouseDown，配对的 mouseUp 也得一起吞，
+    /// 否则有些应用会收到孤零零的 up 而状态错乱。
+    private var swallowNextMouseUp = false
+
     /// 双击 ⌘ 的状态。
     private var lastCommandRelease: CFAbsoluteTime = 0
     private var commandWasAlone = false
@@ -58,6 +62,7 @@ final class EventTapService {
 
     private func threadMain() {
         let mask = (1 << CGEventType.leftMouseDown.rawValue)
+            | (1 << CGEventType.leftMouseUp.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue)
 
@@ -93,7 +98,16 @@ final class EventTapService {
         case .keyDown:
             return handleKeyDown(event)
         case .leftMouseDown:
-            handleMouseDown(event)
+            if handleMouseDown(event) {
+                swallowNextMouseUp = true
+                return nil
+            }
+            return Unmanaged.passUnretained(event)
+        case .leftMouseUp:
+            if swallowNextMouseUp {
+                swallowNextMouseUp = false
+                return nil
+            }
             return Unmanaged.passUnretained(event)
         case .flagsChanged:
             handleFlagsChanged(event)
@@ -123,24 +137,32 @@ final class EventTapService {
         return nil   // 吞掉
     }
 
-    private func handleMouseDown(_ event: CGEvent) {
-        guard event.getIntegerValueField(.mouseEventClickState) == 2 else { return }
+    /// 返回值：要不要吞掉这次点击。
+    ///
+    /// 带修饰键的手势必须吞——放行的话鼠标底下那个应用会被激活抢走 key window，
+    /// 快捷条刚弹出来就被自己的 resignKey 收掉了。
+    /// 裸双击模式不能吞，否则选词、打开文件全废。
+    private func handleMouseDown(_ event: CGEvent) -> Bool {
+        guard event.getIntegerValueField(.mouseEventClickState) == 2 else { return false }
         let settings = Store.shared.settings
         let flags = event.flags.intersection(TriggerModifier.allFlags)
         let location = event.location
+        var swallow = true
 
         switch settings.trigger {
         case .modifierDoubleClick:
-            guard flags == settings.modifier.flag.intersection(TriggerModifier.allFlags) else { return }
+            guard flags == settings.modifier.flag.intersection(TriggerModifier.allFlags) else { return false }
         case .desktopDoubleClick:
-            guard flags.isEmpty, ScreenProbe.isDesktop(at: location) else { return }
+            guard flags.isEmpty, ScreenProbe.isDesktop(at: location) else { return false }
         case .bareDoubleClick:
-            guard flags.isEmpty, !isFrontmostExcluded(settings) else { return }
+            guard flags.isEmpty, !isFrontmostExcluded(settings) else { return false }
+            swallow = false
         case .doubleCommand:
-            return
+            return false
         }
 
         DispatchQueue.main.async { [weak self] in self?.onTrigger?(location) }
+        return swallow
     }
 
     /// 连按两下 ⌘：两次「按下又松开且期间没按别的键」的间隔小于 400ms。
