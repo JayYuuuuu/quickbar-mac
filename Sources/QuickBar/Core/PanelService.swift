@@ -68,8 +68,15 @@ final class PanelService {
     ///
     /// 走系统自带的「前往文件夹」（⌘⇧G）。优先用 AX 直接写输入框——
     /// 不碰剪贴板，也绕开「前往文件夹」的自动补全；写不进去才退回粘贴。
-    func jump(to path: String) {
-        guard currentPanel() != nil else { return }
+    func jump(to path: String, retriesLeft: Int = 4) {
+        // 刚从快捷条点过来时，焦点可能还没回到面板上，退避重试几次。
+        guard currentPanel() != nil else {
+            guard retriesLeft > 0 else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                self.jump(to: path, retriesLeft: retriesLeft - 1)
+            }
+            return
+        }
         let expanded = (path as NSString).expandingTildeInPath
 
         Keyboard.post(keyCode: Keyboard.g, flags: [.maskCommand, .maskShift])

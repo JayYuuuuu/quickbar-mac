@@ -33,6 +33,7 @@ final class QuickBarPanel: NSPanel {
     private var filter = ""
     private var panelContext: DetectedPanel?
     private var iconCache: [String: NSImage] = [:]
+    private var listHeightConstraint: NSLayoutConstraint!
 
     init() {
         super.init(
@@ -145,6 +146,10 @@ final class QuickBarPanel: NSPanel {
             footer.widthAnchor.constraint(equalTo: root.widthAnchor),
             listStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
         ])
+
+        // 只建一次，之后改 constant——每次 reload 新建约束会越堆越多然后互相打架
+        listHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 120)
+        listHeightConstraint.isActive = true
     }
 
     // MARK: - 显示
@@ -296,14 +301,9 @@ final class QuickBarPanel: NSPanel {
 
     private func resizeToFit() {
         listStack.layoutSubtreeIfNeeded()
-        let contentHeight = listStack.fittingSize.height
-        let listHeight = min(contentHeight, Self.maxListHeight)
-        scrollView.heightAnchor.constraint(equalToConstant: listHeight).isActive = true
-        for constraint in scrollView.constraints where constraint.firstAttribute == .height {
-            constraint.constant = listHeight
-        }
-        let total = 42 + 31 + listHeight + 1 + 30
-        setContentSize(NSSize(width: Self.panelWidth, height: total))
+        let listHeight = min(listStack.fittingSize.height, Self.maxListHeight)
+        listHeightConstraint.constant = listHeight
+        setContentSize(NSSize(width: Self.panelWidth, height: 42 + 31 + listHeight + 1 + 30))
     }
 
     private func updateSelection() {
@@ -327,10 +327,17 @@ final class QuickBarPanel: NSPanel {
 
     private func activate(_ item: QuickItem, disabled: Bool) {
         guard !disabled else { return }
+        // 用弹出那一刻抓到的上下文，而不是事后再查：快捷条一旦成为 key 窗口，
+        // 「当前聚焦窗口」就变成我们自己了，再查必然查不到那个文件面板。
+        let wasInPanel = panelContext != nil
         hide()
-        // 先让面板消失、焦点回到原来的窗口，再动手。
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-            Actions.activate(item)
+        // 等焦点真正回到原来的窗口再动手。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            if wasInPanel, item.kind == .folder {
+                PanelService.shared.jump(to: item.path)
+            } else {
+                Actions.activate(item)
+            }
         }
     }
 
@@ -363,7 +370,20 @@ final class QuickBarPanel: NSPanel {
         guard !selectableIndexes.isEmpty else { return }
         selection = (selection + delta + selectableIndexes.count) % selectableIndexes.count
         updateSelection()
-        if selection < rowViews.count { rowViews[selection].scrollToVisible(rowViews[selection].bounds) }
+        selectedRowView()?.scrollToVisible(selectedRowView()!.bounds)
+    }
+
+    /// selectableIndexes 排除了禁用行，rowViews 没有——两者下标不通用，得换算。
+    private func selectedRowView() -> RowView? {
+        guard !selectableIndexes.isEmpty else { return nil }
+        let entryIndex = selectableIndexes[min(selection, selectableIndexes.count - 1)]
+        var cursor = 0
+        for (index, entry) in entries.enumerated() {
+            guard case .item = entry else { continue }
+            if index == entryIndex { return cursor < rowViews.count ? rowViews[cursor] : nil }
+            cursor += 1
+        }
+        return nil
     }
 
     private func activateSelection() {
