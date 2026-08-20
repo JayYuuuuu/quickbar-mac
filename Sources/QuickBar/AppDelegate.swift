@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 无 Dock 图标、无窗口，纯后台。
         NSApp.setActivationPolicy(.accessory)
 
+        MainMenu.install()
+
         _ = Store.shared
         quickBar = QuickBarPanel()
 

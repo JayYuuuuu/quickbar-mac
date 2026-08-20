@@ -158,8 +158,8 @@ private struct ItemsPane: View {
             Divider()
 
             List(selection: $selection) {
-                ForEach(store.items) { item in
-                    ItemRow(item: item)
+                ForEach($store.items) { $item in
+                    ItemRow(item: $item)
                         .tag(item.id)
                 }
                 .onMove { source, destination in
@@ -168,6 +168,7 @@ private struct ItemsPane: View {
                 .onDelete { store.items.remove(atOffsets: $0) }
             }
             .listStyle(.inset)
+            .onDeleteCommand(perform: removeSelected)
 
             Divider()
             HStack(spacing: 6) {
@@ -237,24 +238,85 @@ private struct ItemsPane: View {
 }
 
 private struct ItemRow: View {
-    let item: QuickItem
+    @Binding var item: QuickItem
+
+    @State private var isEditing = false
+    @State private var draft = ""
+    @State private var isHovering = false
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 9) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
                 .resizable().frame(width: 19, height: 19)
-            Text(item.name)
+
+            if isEditing {
+                TextField("", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focused)
+                    .frame(maxWidth: 220)
+                    .onSubmit(commit)
+                    .onExitCommand { isEditing = false }
+            } else {
+                Text(item.name)
+                    .onTapGesture(count: 2, perform: beginEditing)
+                    .help(item.isRenamed ? "原名：\(item.originalName)" : item.path)
+            }
+
             if item.kind == .app, Actions.isRunning(item) {
                 Circle().fill(.green).frame(width: 5, height: 5)
                     .help("已在运行")
             }
+
             Spacer()
+
+            // 悬停才出现，平时不占视觉重量
+            if isHovering, !isEditing {
+                Button(action: beginEditing) {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("重命名——只改快捷条上的显示名，不动文件夹本身")
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+                .buttonStyle(.borderless)
+                .help("在 Finder 中显示")
+            }
+
             Text(item.compactPath)
                 .font(.caption).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.middle)
                 .help(item.path)
         }
         .padding(.vertical, 2)
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            Button("重命名…", action: beginEditing)
+            if item.isRenamed {
+                Button("恢复原名「\(item.originalName)」") { item.name = item.originalName }
+            }
+            Divider()
+            Button("在 Finder 中显示") {
+                NSWorkspace.shared.activateFileViewerSelecting([item.url])
+            }
+        }
+    }
+
+    private func beginEditing() {
+        draft = item.name
+        isEditing = true
+        // 等 TextField 真正出现再抢焦点，否则这一拍焦点会落空。
+        DispatchQueue.main.async { focused = true }
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        item.name = trimmed.isEmpty ? item.originalName : trimmed
+        isEditing = false
     }
 }
 

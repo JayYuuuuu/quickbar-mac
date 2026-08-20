@@ -18,6 +18,13 @@ struct QuickItem: Codable, Identifiable, Hashable {
 
     var url: URL { URL(fileURLWithPath: path) }
 
+    /// 磁盘上的真实名字。重命名只改快捷条上的显示名，不碰文件系统。
+    var originalName: String {
+        kind == .app ? url.deletingPathExtension().lastPathComponent : url.lastPathComponent
+    }
+
+    var isRenamed: Bool { name != originalName }
+
     /// 路径在快捷条右侧的紧凑写法：家目录折成 ~，过长的中间省略。
     var compactPath: String {
         let home = NSHomeDirectory()
