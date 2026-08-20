@@ -257,6 +257,11 @@ private struct ItemRow: View {
                     .frame(maxWidth: 220)
                     .onSubmit(commit)
                     .onExitCommand { isEditing = false }
+                    // 点到别处也要收尾。少了这条，输入框会永远留在编辑态，
+                    // 而编辑态又把悬停按钮藏起来了——结果这一行再也改不了名。
+                    .onChange(of: focused) { hasFocus in
+                        if !hasFocus, isEditing { commit() }
+                    }
             } else {
                 Text(item.name)
                     .onTapGesture(count: 2, perform: beginEditing)
