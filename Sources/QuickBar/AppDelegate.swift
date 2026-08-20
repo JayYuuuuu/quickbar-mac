@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar?.onJumpToFinder = { [weak self] in self?.jumpToFinder() }
 
         FinderService.shared.start()
+        Availability.shared.start()
         PanelService.shared.startWatchingPanelSize()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }

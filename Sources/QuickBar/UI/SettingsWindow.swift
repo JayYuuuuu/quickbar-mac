@@ -144,6 +144,7 @@ private struct VisualEffect: NSViewRepresentable {
 private struct ItemsPane: View {
     @ObservedObject var store: Store
     @State private var selection = Set<QuickItem.ID>()
+    @State private var unavailable = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -152,6 +153,11 @@ private struct ItemsPane: View {
                 Text("\(store.folders.count) 个文件夹 · \(store.apps.count) 个应用")
                     .font(.caption).foregroundStyle(.secondary)
                     .help("快捷条按这个顺序显示，拖动可以排序。")
+                if unavailable > 0 {
+                    Text("\(unavailable) 项找不到")
+                        .font(.caption).bold().foregroundStyle(.orange)
+                        .help("外置盘没接上时也会这样。QuickBar 只标记不删除，接回去就恢复。")
+                }
                 Spacer()
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -194,6 +200,10 @@ private struct ItemsPane: View {
                     .font(.caption).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
+        }
+        .onAppear { Availability.shared.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .quickBarAvailabilityChanged)) { _ in
+            unavailable = Availability.shared.unavailableCount
         }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
             for provider in providers {
@@ -268,7 +278,12 @@ private struct ItemRow: View {
                     .help(item.isRenamed ? "原名：\(item.originalName)" : item.path)
             }
 
-            if item.kind == .app, Actions.isRunning(item) {
+            if let note = Availability.shared.state(of: item).label {
+                Circle().fill(.orange).frame(width: 5, height: 5)
+                Text(note)
+                    .font(.caption).foregroundStyle(.orange)
+                    .help("QuickBar 只标记不删除——外置盘接回去就自动恢复。")
+            } else if item.kind == .app, Actions.isRunning(item) {
                 Circle().fill(.green).frame(width: 5, height: 5)
                     .help("已在运行")
             }

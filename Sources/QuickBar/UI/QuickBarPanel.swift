@@ -170,6 +170,7 @@ final class QuickBarPanel: NSPanel {
     }
 
     func show() {
+        Availability.shared.refresh()   // 后台跑，不挡这次弹出
         filter = ""
         selection = 0
         panelContext = PanelService.shared.currentPanel()
@@ -295,8 +296,13 @@ final class QuickBarPanel: NSPanel {
                 pieces += 1
 
             case .item(let item, let pinned):
-                let disabled = panelContext != nil && item.kind == .app
-                let row = RowView(item: item, pinned: pinned, disabled: disabled, icon: icon(for: item))
+                let availability = Availability.shared.state(of: item)
+                // 找不到的条目照样列出来（免得用户以为自己没加过），
+                // 但置灰、不可选中，右侧一行说清是什么情况。
+                let unavailableNote = availability.label
+                let disabled = unavailableNote != nil || (panelContext != nil && item.kind == .app)
+                let row = RowView(item: item, pinned: pinned, disabled: disabled,
+                                  note: unavailableNote, icon: icon(for: item))
                 row.onClick = { [weak self] in self?.activate(item, disabled: disabled) }
                 row.onHover = { [weak self] in
                     guard let self, let position = self.selectableIndexes.firstIndex(of: index) else { return }
@@ -455,7 +461,7 @@ private final class RowView: NSView {
     private let runningDot = NSView()
     private let disabled: Bool
 
-    init(item: QuickItem, pinned: Bool, disabled: Bool, icon: NSImage) {
+    init(item: QuickItem, pinned: Bool, disabled: Bool, note: String?, icon: NSImage) {
         self.disabled = disabled
         super.init(frame: .zero)
         wantsLayer = true
@@ -473,7 +479,12 @@ private final class RowView: NSView {
         detailLabel.lineBreakMode = .byTruncatingMiddle
         detailLabel.alignment = .right
 
-        if pinned {
+        if let note {
+            detailLabel.stringValue = note
+            toolTip = note.contains("未挂载")
+                ? "接回这个卷就能用了。QuickBar 不会因为找不到就把条目删掉。"
+                : "\(item.path) 已经不在了。右键可以移除这个条目。"
+        } else if pinned {
             detailLabel.stringValue = "Finder 当前"
             detailLabel.alignment = .left
             badge.stringValue = "⌘G"
