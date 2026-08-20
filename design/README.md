@@ -1,6 +1,6 @@
 # 界面设计稿
 
-QuickBar 动手写代码之前的六块界面草图，用 Claude Design 的画布格式（`.dc.html`）画的。
+QuickBar 的九块界面稿，用 Claude Design 的画布格式（`.dc.html`）画的。
 
 画布分两页。
 
@@ -34,7 +34,7 @@ QuickBar 动手写代码之前的六块界面草图，用 Claude Design 的画�
 
 ## 怎么改
 
-`src/` 里是真正的授权输入：`_style.txt` 是六块共用的样式，`*.body.html` 是各自的内容。根目录的 `*.dc.html` 是把两者拼起来的产物——**别直接改它们**，改 `src/` 然后重新生成：
+`src/` 里是真正的授权输入：`_style.txt` 是九块共用的样式，`*.body.html` 是各自的内容。根目录的 `*.dc.html` 是把两者拼起来的产物——**别直接改它们**，改 `src/` 然后重新生成：
 
 ```bash
 cd design && python3 src/build.py
