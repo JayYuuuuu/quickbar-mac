@@ -14,6 +14,8 @@ final class QuickBarPanel: NSPanel {
     private static let panelWidth: CGFloat = 298
     private static let rowHeight: CGFloat = 28
     private static let maxListHeight: CGFloat = 340
+    /// 不筛选时快捷条上直接列出来的素材批次条数；再多就要靠输品牌名筛。
+    private static let batchPreviewCount = 6
 
     private let effect = RoundedEffectView()
     private let contextIcon = NSImageView()
@@ -171,6 +173,7 @@ final class QuickBarPanel: NSPanel {
 
     func show() {
         Availability.shared.refresh()   // 后台跑，不挡这次弹出
+        MaterialFeed.shared.refresh(force: false)   // 同样是后台；这次弹出用的是缓存
         filter = ""
         selection = 0
         panelContext = PanelService.shared.currentPanel()
@@ -247,6 +250,18 @@ final class QuickBarPanel: NSPanel {
             if Pinyin.score(name: pinned.name, path: pinned.path, needle: needle) != nil {
                 entries.append(.item(pinned, pinned: true))
             }
+        }
+
+        // 素材批次排在最前：这批目录带时间戳、每派一单换一个，是最可能要跳过去的地方。
+        // 不筛选时只列最近几条（免得把手工条目挤出视野），但**把总数写在标题上**——
+        // 悄悄截断会让人以为「那一批没下下来」。
+        let batches = rank(MaterialFeed.shared.items, needle: needle)
+        if !batches.isEmpty {
+            let shown = needle.isEmpty ? Array(batches.prefix(Self.batchPreviewCount)) : batches
+            entries.append(.header(shown.count < batches.count
+                                   ? "素材批次 · 最近 \(shown.count) / 共 \(batches.count)"
+                                   : "素材批次"))
+            entries.append(contentsOf: shown.map { .item($0, pinned: false) })
         }
 
         let folders = rank(store.folders, needle: needle)
@@ -495,6 +510,10 @@ private final class RowView: NSView {
             toolTip = "文件面板里没有「启动应用」这个动作。"
         } else if item.kind == .app {
             detailLabel.stringValue = Actions.isRunning(item) ? "切到前台" : "启动"
+        } else if let subtitle = item.subtitle, !subtitle.isEmpty {
+            // 来源自己写好的一行结论（素材批次的件数/进度）比紧凑路径有用得多。
+            detailLabel.stringValue = subtitle
+            toolTip = item.path
         } else {
             detailLabel.stringValue = item.compactPath
             toolTip = item.path

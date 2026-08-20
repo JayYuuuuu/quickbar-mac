@@ -14,6 +14,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onOpenPermissions: (() -> Void)?
     var onToggleTrigger: (() -> Void)?
     var onJumpToFinder: (() -> Void)?
+    var onOpenNewestBatch: (() -> Void)?
 
     override init() {
         super.init()
@@ -35,6 +36,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let jump = item("跳到 Finder 当前", action: #selector(jumpToFinder))
             jump.toolTip = FinderService.shared.currentPath
             menu.addItem(jump)
+        }
+
+        // 最新那一批素材：下完之后第一件事就是去开它，给个不用弹快捷条的入口。
+        if let batch = MaterialFeed.shared.newest {
+            let open = item("打开 \(batch.name)", action: #selector(openNewestBatch))
+            open.toolTip = batch.path
+            menu.addItem(open)
         }
 
         menu.addItem(.separator())
@@ -89,6 +97,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func openSettings() { onOpenSettings?() }
     @objc private func openPermissions() { onOpenPermissions?() }
     @objc private func jumpToFinder() { onJumpToFinder?() }
+    @objc private func openNewestBatch() { onOpenNewestBatch?() }
     @objc private func checkUpdates() { Updater.shared.check(userInitiated: true) }
     @objc private func quit() { NSApp.terminate(nil) }
 

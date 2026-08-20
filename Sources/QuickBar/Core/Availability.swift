@@ -63,7 +63,8 @@ final class Availability {
     }
 
     func refresh() {
-        let paths = Store.shared.items.map(\.path)
+        // 素材批次那批目录也在 /Volumes 上，NAS 一掉线同样要标出来，所以一起探。
+        let paths = Store.shared.items.map(\.path) + MaterialFeed.shared.items.map(\.path)
         probeQueue.async { [weak self] in
             let mounted = Set(
                 (FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil,

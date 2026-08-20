@@ -1,6 +1,7 @@
 import AppKit
+import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
 
     private var menuBar: MenuBarController?
     private var quickBar: QuickBarPanel?
@@ -25,9 +26,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar?.onOpenPermissions = { [weak self] in self?.showOnboarding() }
         menuBar?.onToggleTrigger = { [weak self] in self?.toggleTrigger() }
         menuBar?.onJumpToFinder = { [weak self] in self?.jumpToFinder() }
+        menuBar?.onOpenNewestBatch = {
+            guard let batch = MaterialFeed.shared.newest else { return }
+            Actions.openFolder(batch.path)
+        }
 
         FinderService.shared.start()
         Availability.shared.start()
+        // 点素材批次的完成通知要能直接开那个文件夹，所以委托得在 MaterialFeed 起来之前装好。
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().delegate = self
+        }
+        MaterialFeed.shared.start()
         PanelService.shared.startWatchingPanelSize()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }
@@ -46,6 +56,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         Store.shared.saveNow()
         EventTapService.shared.stop()
+    }
+
+    // MARK: - 通知
+
+    /// QuickBar 平时在后台，横幅要在前台也能看到，否则「下完了」这条永远不弹。
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    /// 点通知 = 去开那个批次目录。
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        if let path = response.notification.request.content.userInfo["path"] as? String, !path.isEmpty {
+            Actions.openFolder(path)
+        }
+        completionHandler()
     }
 
     // MARK: - 动作

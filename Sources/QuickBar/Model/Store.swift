@@ -15,6 +15,9 @@ struct QuickItem: Codable, Identifiable, Hashable {
     var path: String
     /// 应用才有，用来判断是否已在运行。
     var bundleID: String?
+    /// 右侧那一行结论，由来源自己写死（素材批次用它印「7 件 · 08-20 13:05」）。
+    /// 用户手动加的条目留空，右侧照旧显示紧凑路径。
+    var subtitle: String?
 
     var url: URL { URL(fileURLWithPath: path) }
 
@@ -121,6 +124,13 @@ struct Settings: Codable {
 
     var autoUpdate: Bool = true
     var autoUpdateSilently: Bool = true
+
+    // 素材批次（对接 AI 电商内容助手的素材下载单，见 Core/MaterialFeed.swift）。
+    // 服务器地址写死在 MaterialFeed 里，不做成设置项——它只有一个值，
+    // 摆出来只会多一处能填错的地方，还得配一句解释。
+    var materialFeedEnabled: Bool = false
+    var materialFeedKey: String = ""
+    var materialFeedNotify: Bool = true
 
     /// 记住的文件面板尺寸（全局一份）。
     var panelWidth: Double = 0

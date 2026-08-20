@@ -23,12 +23,13 @@ final class SettingsWindowController: NSWindowController {
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case items, trigger, permissions, general
+    case items, material, trigger, permissions, general
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .items: return "条目"
+        case .material: return "素材批次"
         case .trigger: return "触发"
         case .permissions: return "权限"
         case .general: return "通用"
@@ -38,6 +39,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .items: return "folder"
+        case .material: return "shippingbox"
         case .trigger: return "cursorarrow.click.2"
         case .permissions: return "lock.shield"
         case .general: return "gearshape"
@@ -79,6 +81,7 @@ struct SettingsView: View {
             Group {
                 switch section {
                 case .items: ItemsPane(store: store)
+                case .material: MaterialPane(store: store)
                 case .trigger: TriggerPane(store: store)
                 case .permissions: PermissionsPane(missing: $missingPermissions)
                 case .general: GeneralPane(store: store)
@@ -439,6 +442,72 @@ private struct PermissionRow: View {
                 Button("授权") { Permissions.request(kind) }
             }
         }
+    }
+}
+
+// MARK: - 素材批次
+
+/// 对接「AI 电商内容助手」的素材下载单：把最近派的批次目录直接摆到快捷条上。
+///
+/// 界面上只有一个密码要填（服务器地址内置，见 MaterialFeed.server）。填错什么、
+/// 连不通什么，全压在底下那一行状态里，不在界面上铺说明——真要解释的进 help tip。
+private struct MaterialPane: View {
+    @ObservedObject var store: Store
+    @State private var status = MaterialFeed.shared.statusText
+    @State private var age = ""
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("把最近的素材下载批次放进快捷条", isOn: Binding(
+                    get: { store.settings.materialFeedEnabled },
+                    set: { store.settings.materialFeedEnabled = $0; MaterialFeed.shared.start() }
+                ))
+                .help("素材落在 <采集根>/<品牌>/<时间戳_批次>/，每派一单就换一个新目录，手工加书签跟不上，所以由服务器喂。")
+
+                // 逐字符触发同步会在打字过程中发一串必然 401 的请求，所以只在回车时才试；
+                // 不按回车也行，底下「立即同步」是同一个动作。
+                SecureField("密码", text: Binding(
+                    get: { store.settings.materialFeedKey },
+                    set: { store.settings.materialFeedKey = $0 }
+                ))
+                .disabled(!store.settings.materialFeedEnabled)
+                .onSubmit { MaterialFeed.shared.start() }
+                .help("团队内部那一串。它只能读「批次落在哪个目录、下完没有」，派单、重下、回写都够不着。")
+
+                Toggle("下完了通知我", isOn: Binding(
+                    get: { store.settings.materialFeedNotify },
+                    set: { store.settings.materialFeedNotify = $0 }
+                ))
+                .disabled(!store.settings.materialFeedEnabled)
+                .help("点通知直接在 Finder 里打开那个批次目录。")
+            } header: {
+                Text("素材批次")
+            } footer: {
+                HStack(spacing: 8) {
+                    Button("立即同步") {
+                        MaterialFeed.shared.start()
+                    }
+                    .disabled(!store.settings.materialFeedEnabled)
+                    Text(age.isEmpty ? status : "\(status) · \(age)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            status = MaterialFeed.shared.statusText
+            age = MaterialPane.age(of: MaterialFeed.shared.lastSyncAt)
+        }
+    }
+
+    /// 「多久以前同步的」——比一个绝对时间戳好读，也顺便让人看出通道是不是停了。
+    static func age(of date: Date?) -> String {
+        guard let date else { return "" }
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "刚刚" }
+        if seconds < 3600 { return "\(seconds / 60) 分钟前" }
+        return "\(seconds / 3600) 小时前"
     }
 }
 
