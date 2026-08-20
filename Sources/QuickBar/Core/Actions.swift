@@ -30,16 +30,37 @@ enum Actions {
     }
 
     /// 已经在跑就切到前台，没跑就启动。
+    ///
+    /// macOS 14 起跨应用激活是**协作式**的：像 QuickBar 这种后台程序直接调
+    /// `NSRunningApplication.activate()` 会被系统静默忽略——不报错，就是不切。
+    /// 所以要先 `yieldActivation` 把激活权让出去，并且真正的切换交给
+    /// LaunchServices（`openApplication`）来做，它是唯一稳的路径。
+    /// 已经在跑的普通应用不会被开第二个，只会被带到前台。
     static func launchOrActivate(_ item: QuickItem) {
-        if let running = runningInstance(of: item) {
-            running.activate(options: [.activateAllWindows])
-            return
+        let running = runningInstance(of: item)
+
+        if #available(macOS 14.0, *) {
+            if let running {
+                NSApp.yieldActivation(to: running)
+            } else if let bundleID = item.bundleID {
+                NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleID)
+            }
         }
+
+        // 最小化或隐藏过的先恢复，否则切过去看不见窗口。
+        running?.unhide()
+
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-        NSWorkspace.shared.openApplication(at: item.url, configuration: config) { _, error in
+        NSWorkspace.shared.openApplication(at: item.url, configuration: config) { app, error in
             if let error {
-                NSLog("[QuickBar] 启动 \(item.name) 失败: \(error.localizedDescription)")
+                NSLog("[QuickBar] 切换到 \(item.name) 失败: \(error.localizedDescription)")
+                return
+            }
+            // LaunchServices 偶尔只是把进程带起来而没抢到前台，补一刀。
+            guard let app else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if !app.isActive { app.activate(options: [.activateAllWindows]) }
             }
         }
     }

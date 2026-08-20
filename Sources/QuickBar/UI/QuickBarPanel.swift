@@ -178,12 +178,25 @@ final class QuickBarPanel: NSPanel {
 
         let point = NSEvent.mouseLocation
         setFrameTopLeft(near: point)
+
+        // 必须把应用本身激活。键盘事件只会送给「当前活跃应用」的 key window，
+        // QuickBar 平时是不活跃的后台程序，光 makeKey() 收不到任何按键——
+        // 表现就是弹出来了但打字没反应、回车也没反应。
+        if #available(macOS 14.0, *) {
+            NSApp.activate()
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         orderFrontRegardless()
         makeKey()
     }
 
     func hide() {
         orderOut(nil)
+        // 把活跃状态还回去，否则会一直挡着用户原来在用的那个应用。
+        // 设置窗之类还开着的时候不能还，那会把它也踢到后面。
+        let hasOtherWindow = NSApp.windows.contains { $0 !== self && $0.isVisible }
+        if !hasOtherWindow { NSApp.deactivate() }
     }
 
     override func resignKey() {
@@ -365,7 +378,7 @@ final class QuickBarPanel: NSPanel {
         let wasInPanel = panelContext != nil
         hide()
         // 等焦点真正回到原来的窗口再动手。
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             if wasInPanel, item.kind == .folder {
                 PanelService.shared.jump(to: item.path)
             } else {
