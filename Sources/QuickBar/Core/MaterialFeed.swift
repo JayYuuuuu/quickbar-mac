@@ -20,8 +20,12 @@ final class MaterialFeed {
     /// 服务器地址。团队只有这一台，写死比让每个人填一遍靠谱。
     private static let server = "https://ai.yujiev.com:8444"
 
+    /// 🔴 缓存的是批次本身，不是渲染好的条目：`detail` 里「今天只报时分」的判断跟当前日期有关，
+    /// 存渲染结果的话跨夜就定死了——昨天的批次会一直显示成只有时分，看不出是昨天。
+    private var batches: [MaterialBatch] = []
+
     /// 面板直接读这个。只在主线程读写。
-    private(set) var items: [QuickItem] = []
+    var items: [QuickItem] { batches.map(\.quickItem) }
 
     /// 设置页那一行结论。
     private(set) var statusText = "未启用"
@@ -64,8 +68,8 @@ final class MaterialFeed {
             // 关掉之后必须把条目和缓存一起清干净，否则下次开机 loadCache() 会把
             // 一批过期目录又摆回快捷条上——用户已经明确说不要了。
             statusText = Store.shared.settings.materialFeedEnabled ? "还没填密码" : "未启用"
-            guard !items.isEmpty else { return }
-            items = []
+            guard !batches.isEmpty else { return }
+            batches = []
             lastSyncAt = nil
             saveCache()
             Availability.shared.refresh()
@@ -165,7 +169,7 @@ final class MaterialFeed {
         // 派了单但还没落盘的批次直接丢掉（点了也跳不过去）；
         // 卷没挂的**留着**并交给 Availability 标记——「找不到就标记，绝不自动删」是本项目的既定原则。
         let usable = resolved.filter { $0.1 != .missing }.map { $0.0 }
-        items = usable.map(\.quickItem)
+        batches = usable
         lastSyncAt = Date()
         statusText = usable.isEmpty ? "没有可用批次" : "\(usable.count) 个批次"
 
@@ -176,7 +180,7 @@ final class MaterialFeed {
     }
 
     /// 最新那一批，菜单栏直接给个入口。
-    var newest: QuickItem? { items.first }
+    var newest: QuickItem? { batches.first?.quickItem }
 
     // MARK: - 下完通知
 
@@ -207,7 +211,7 @@ final class MaterialFeed {
 
     /// 缓存的意义是「开机后不用等第一次网络往返，快捷条上就已经有批次」。
     private struct Cache: Codable {
-        var items: [QuickItem]
+        var batches: [MaterialBatch]
         var notified: [String]
         var seeded: Bool
     }
@@ -217,13 +221,13 @@ final class MaterialFeed {
     private func loadCache() {
         guard let data = try? Data(contentsOf: cacheURL),
               let cache = try? JSONDecoder().decode(Cache.self, from: data) else { return }
-        items = cache.items
+        batches = cache.batches
         notified = Set(cache.notified)
         seeded = cache.seeded
     }
 
     private func saveCache() {
-        let cache = Cache(items: items, notified: Array(notified), seeded: seeded)
+        let cache = Cache(batches: batches, notified: Array(notified), seeded: seeded)
         guard let data = try? JSONEncoder().encode(cache) else { return }
         try? data.write(to: cacheURL, options: .atomic)
     }
@@ -232,7 +236,7 @@ final class MaterialFeed {
 // MARK: - 一个批次
 
 /// 一个素材下载批次：服务端那一行里，快捷条真正用得上的部分。
-struct MaterialBatch {
+struct MaterialBatch: Codable {
     let id: String
     let brand: String
     let batchDir: String
@@ -298,17 +302,31 @@ struct MaterialBatch {
         return stamp.isEmpty ? "\(itemCount) 件" : "\(itemCount) 件 · \(stamp)"
     }
 
-    /// `20260820-1305_补素材` → `08-20 13:05`。批次目录名自带时间，不必再解析 ISO 日期。
+    /// `20260820-1305_补素材` → `08-20 13:05`，**今天的只报 `13:05`**。
+    ///
+    /// 批次目录名自带时间，不必再解析 ISO 日期。今天的省掉日期不只是为了短：
+    /// 人来找批次十有八九找的就是刚下的那批，「08-20」这天天一样的四个字符是噪音，
+    /// 省下来正好够右侧那行完整显示，不至于被挤成 `28 件…09:16`。
     static func stamp(from batchDir: String) -> String {
         let head = batchDir.split(separator: "_").first.map(String.init) ?? ""
         let parts = head.split(separator: "-")
         guard parts.count == 2, parts[0].count == 8, parts[1].count == 4 else { return "" }
         let date = parts[0], time = parts[1]
+        let clock = "\(time.prefix(2)):\(time.suffix(2))"
+        if date == Self.today() { return clock }
         let month = date[date.index(date.startIndex, offsetBy: 4)..<date.index(date.startIndex, offsetBy: 6)]
         let day = date[date.index(date.startIndex, offsetBy: 6)...]
-        let hour = time.prefix(2), minute = time.suffix(2)
-        return "\(month)-\(day) \(hour):\(minute)"
+        return "\(month)-\(day) \(clock)"
     }
+
+    /// 批次目录名是服务端按北京时间打的戳，Mac 也在同一时区，直接按本地日期比。
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyyMMdd"
+        return f
+    }()
+
+    static func today() -> String { dayFormatter.string(from: Date()) }
 
     var quickItem: QuickItem {
         var item = QuickItem(kind: .folder, name: displayName, path: path)

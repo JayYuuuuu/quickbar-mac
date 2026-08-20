@@ -11,7 +11,7 @@ final class QuickBarPanel: NSPanel {
         case item(QuickItem, pinned: Bool)
     }
 
-    private static let panelWidth: CGFloat = 298
+    private static let panelWidth: CGFloat = 326
     private static let rowHeight: CGFloat = 28
     private static let maxListHeight: CGFloat = 340
     /// 不筛选时快捷条上直接列出来的素材批次条数；再多就要靠输品牌名筛。
@@ -554,7 +554,15 @@ private final class RowView: NSView {
             runningDot.widthAnchor.constraint(equalToConstant: 5),
             runningDot.heightAnchor.constraint(equalToConstant: 5)
         ])
-        detailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // 右侧那行谁先让位：手工条目右边是长路径，压掉不心疼；素材批次右边是「件数 · 时间」
+        // 这种结论，压了就成 "28 件…09:16"，把最该看的信息弄没了 —— 所以反过来让名字先截尾
+        // （品牌名在最前面，截掉的是批次码尾巴，照样认得出来）。
+        if item.subtitle?.isEmpty == false {
+            detailLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+            nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        } else {
+            detailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
         alphaValue = disabled ? 0.45 : 1
         applyColors()
     }
