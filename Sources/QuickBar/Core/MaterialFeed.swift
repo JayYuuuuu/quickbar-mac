@@ -41,7 +41,11 @@ final class MaterialFeed {
     private let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 12
-        config.waitsForConnectivity = false
+        // 🔴 必须 true。开机自启时 didFinishLaunching 跑在网络栈就绪之前，
+        // false 会让这一发**立刻**失败成 -1009「似乎已断开与互联网的连接」——
+        // 不是超时、是零延迟返回，看起来像服务器挂了。实测踩过。
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForResource = 30   // 但也不能无限等，30 秒还不通就当这次失败
         return URLSession(configuration: config)
     }()
 
@@ -69,7 +73,9 @@ final class MaterialFeed {
             return
         }
         requestNotificationAuthorizationIfNeeded()
-        refresh(force: true)
+        // 首拉延后一拍：开机自启那会儿系统正忙、网络也常常还没起来（同 Updater 的 30 秒退避，
+        // 只是这边要早点有数据，所以短得多）。waitsForConnectivity 是兜底，这个是不去撞它。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.refresh(force: true) }
         timer = Timer.scheduledTimer(withTimeInterval: 180, repeats: true) { [weak self] _ in
             self?.refresh(force: false)
         }
@@ -149,6 +155,9 @@ final class MaterialFeed {
 
         if let error = outcome.error {
             statusText = error   // 拉失败时保留上一批条目：断网不该让快捷条突然少一截
+            // 失败不占节流额度，否则开机时那一发失败后要干等 180 秒；
+            // 清掉之后，下次唤出快捷条就会立刻重试。
+            lastFetchAt = nil
             NotificationCenter.default.post(name: .quickBarMaterialFeedChanged, object: nil)
             return
         }

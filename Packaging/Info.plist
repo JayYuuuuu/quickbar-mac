@@ -28,6 +28,8 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>公司内网的素材服务器，QuickBar 用它读「最近下载的素材批次落在哪个文件夹」。不开这项，快捷条上就没有素材批次；其余功能不受影响。</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>QuickBar 需要询问 Finder 当前打开的是哪个文件夹，用来在上传或保存窗里一键跳转过去。</string>
 	<key>NSHumanReadableCopyright</key>
