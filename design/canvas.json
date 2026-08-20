@@ -1,0 +1,78 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 720,
+      "h": 480,
+      "title": "快捷条 · 常规"
+    },
+    {
+      "file": "Panel.dc.html",
+      "x": 770,
+      "y": 0,
+      "w": 720,
+      "h": 480,
+      "title": "快捷条 · 上传窗内"
+    },
+    {
+      "file": "MenuBar.dc.html",
+      "x": 1540,
+      "y": 0,
+      "w": 560,
+      "h": 420,
+      "title": "菜单栏"
+    },
+    {
+      "file": "Settings.dc.html",
+      "x": 0,
+      "y": 540,
+      "w": 760,
+      "h": 560,
+      "title": "设置 · 条目"
+    },
+    {
+      "file": "Trigger.dc.html",
+      "x": 810,
+      "y": 540,
+      "w": 760,
+      "h": 600,
+      "title": "设置 · 触发与权限"
+    },
+    {
+      "file": "Onboarding.dc.html",
+      "x": 1620,
+      "y": 540,
+      "w": 560,
+      "h": 540,
+      "title": "首次启动引导"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-trigger",
+      "x": 0,
+      "y": -150,
+      "w": 330,
+      "text": "① 触发 = ⌥ + 双击\n裸双击会撞文本选词 / Finder 打开 / 标题栏最大化，\ntap 全程不吞事件。"
+    },
+    {
+      "id": "note-cmdg",
+      "x": 770,
+      "y": -150,
+      "w": 390,
+      "text": "③ 面板判定实测结论\nAXIdentifier = open-panel / save-panel，挂在聚焦 app 的\nAXFocusedWindow 上。沙盒 / 非沙盒 / Chrome 三种全命中，0.5ms。\n⌘G 只在命中时吞键，其他场合仍是各 app 的「查找下一个」。"
+    },
+    {
+      "id": "note-size",
+      "x": 1620,
+      "y": 1120,
+      "w": 330,
+      "text": "⑤ 尺寸记忆走两条路\n普通面板 (AXWindow) → AX 直接改，即时生效。\nChrome (AXSheet) → AX 改不动，写 app 的\nNSNavPanelExpandedSizeForOpenMode，下次打开生效。"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

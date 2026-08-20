@@ -43,6 +43,10 @@ macOS 上的快捷条。⌥ + 双击屏幕任意位置唤出，跳转文件夹�
 
 **签名与自动更新**。macOS 的 TCC 授权是按签名主体记的。如果用 ad-hoc 签名，每次构建 cdhash 都变，静默更新完权限就掉了——所以必须用固定证书签，"静默"才成立。更新包下载后用**当前运行版本自己的 designated requirement** 去校验，签名主体或 bundle id 对不上直接丢弃。
 
+## 界面设计稿
+
+动工前画的六块界面草图在 [`design/`](design/)，深浅色都有。注意那是**动工前**的稿子，后来在真机上撞出来的问题改变了几个决定，`design/README.md` 里列了差异。
+
 ## 从源码构建
 
 需要 macOS 13+ 和 Swift 6 工具链（Xcode 或 Command Line Tools）。

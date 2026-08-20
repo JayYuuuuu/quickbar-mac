@@ -1,0 +1,73 @@
+<div class="{{themeClass}}" style="position:relative;width:560px;height:540px;overflow:hidden">
+  <div class="wall" style="opacity:.9"></div>
+
+  <div style="position:absolute;left:60px;top:38px;width:440px;height:464px;border-radius:14px;background:var(--win);border:.5px solid var(--win-brd);box-shadow:0 26px 60px rgba(0,0,0,.42);display:flex;flex-direction:column;overflow:hidden">
+
+    <div style="display:flex;align-items:center;gap:8px;height:38px;padding:0 14px">
+      <span style="width:10px;height:10px;border-radius:6px;background:#ff5f57"></span>
+      <span style="width:10px;height:10px;border-radius:6px;background:var(--hover)"></span>
+      <span style="width:10px;height:10px;border-radius:6px;background:var(--hover)"></span>
+    </div>
+
+    <div style="padding:4px 34px 0;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <svg width="60" height="60" viewBox="0 0 56 56">
+        <rect width="56" height="56" rx="14" fill="var(--accent)"/>
+        <rect x="13" y="15" width="19" height="4.4" rx="2.2" fill="#fff"/>
+        <rect x="13" y="25.8" width="26" height="4.4" rx="2.2" fill="#fff" opacity=".78"/>
+        <rect x="13" y="36.6" width="14" height="4.4" rx="2.2" fill="#fff" opacity=".55"/>
+        <path d="M36.5 34.6 41.5 39l-5 4.4" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="font-size:19px;font-weight:600;letter-spacing:-.02em">还差 1 项授权</div>
+    </div>
+
+    <div style="padding:20px 30px 0;display:flex;flex-direction:column;gap:8px">
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(40,165,76,.16);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3.4 8.4 6.4 11.4 12.6 5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">辅助功能</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来读取当前是不是文件面板、以及改面板尺寸">已授权</span>
+        </span>
+        <span style="flex:1"></span>
+      </div>
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(40,165,76,.16);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3.4 8.4 6.4 11.4 12.6 5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">输入监控</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来收 ⌥双击 和 ⌘G；QuickBar 不记录也不上传任何按键">已授权</span>
+        </span>
+        <span style="flex:1"></span>
+      </div>
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px;border-color:var(--warn)">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(224,140,26,.18);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 4.2v4.4" stroke="var(--warn)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1.1" fill="var(--warn)"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">自动化 · Finder</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来读「Finder 最前窗口在哪个文件夹」，⌘G 靠它">未授权</span>
+        </span>
+        <span style="flex:1"></span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 14px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:500">去授权</span>
+      </div>
+
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:0 30px 24px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;background:var(--accent);flex:none">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3.6 8.4 6.4 11.2 12.4 5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span style="font-size:12.5px;color:var(--fg2)">开机自动启动</span>
+      <span style="flex:1"></span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 16px;border-radius:7px;background:var(--field);border:.5px solid var(--field-brd);font-size:12.5px;color:var(--fg2)">稍后</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 18px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:500;opacity:.4" title="三项都授权后才可用">开始使用</span>
+    </div>
+  </div>
+</div>

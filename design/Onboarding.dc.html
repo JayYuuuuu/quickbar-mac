@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:13px;letter-spacing:-0.01em}
+    a{color:#0a6cff}
+    a:hover{color:#0850c4}
+    .qb a{color:var(--accent)}
+    .qb{
+      --wall-a:#b9c6d4;--wall-b:#e4dcd1;--wall-c:#8fa3b8;
+      --glass:rgba(249,249,251,.78);--glass-brd:rgba(0,0,0,.10);--glass-top:rgba(255,255,255,.7);
+      --win:#f5f5f7;--win-brd:rgba(0,0,0,.13);--side:rgba(237,237,241,.72);--bar:rgba(246,246,248,.88);
+      --fg:#17171a;--fg2:#77777f;--fg3:#a9a9b1;
+      --sep:rgba(0,0,0,.08);--hover:rgba(0,0,0,.05);
+      --accent:#0a6cff;--accent-soft:rgba(10,108,255,.13);--on-accent:#fff;
+      --field:rgba(255,255,255,.92);--field-brd:rgba(0,0,0,.14);
+      --ok:#28a54c;--warn:#e08c1a;
+      --shadow:0 24px 56px rgba(18,20,26,.28),0 2px 6px rgba(18,20,26,.14);
+      color:var(--fg);
+    }
+    .qb.dark{
+      --wall-a:#2a3542;--wall-b:#3b352d;--wall-c:#161c25;
+      --glass:rgba(45,45,50,.8);--glass-brd:rgba(255,255,255,.13);--glass-top:rgba(255,255,255,.12);
+      --win:#1f1f23;--win-brd:rgba(255,255,255,.11);--side:rgba(37,37,42,.74);--bar:rgba(40,40,45,.88);
+      --fg:#f2f2f5;--fg2:#9b9ba3;--fg3:#6d6d76;
+      --sep:rgba(255,255,255,.085);--hover:rgba(255,255,255,.07);
+      --accent:#3b82ff;--accent-soft:rgba(59,130,255,.2);--on-accent:#fff;
+      --field:rgba(255,255,255,.07);--field-brd:rgba(255,255,255,.14);
+      --ok:#35c25f;--warn:#f0a63c;
+      --shadow:0 28px 64px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.45);
+    }
+    .wall{position:absolute;inset:0;background:
+      radial-gradient(90% 70% at 16% 8%, var(--wall-b) 0%, transparent 58%),
+      radial-gradient(80% 65% at 88% 14%, var(--wall-a) 0%, transparent 62%),
+      linear-gradient(158deg, var(--wall-c) 0%, var(--wall-a) 52%, var(--wall-b) 100%)}
+    .row{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:7px}
+    .grp{font-size:10.5px;font-weight:600;color:var(--fg3);padding:8px 9px 3px;letter-spacing:.02em}
+    .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:4px;background:var(--hover);color:var(--fg2);font-size:10.5px;font-weight:500}
+    .nm{font-size:13px;white-space:nowrap}
+    .pt{font-size:11px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:158px}
+    .sec{font-size:11px;font-weight:600;color:var(--fg2);padding:0 0 8px 2px}
+    .card{background:var(--field);border:.5px solid var(--field-brd);border-radius:9px}
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="position:relative;width:560px;height:540px;overflow:hidden">
+  <div class="wall" style="opacity:.9"></div>
+
+  <div style="position:absolute;left:60px;top:38px;width:440px;height:464px;border-radius:14px;background:var(--win);border:.5px solid var(--win-brd);box-shadow:0 26px 60px rgba(0,0,0,.42);display:flex;flex-direction:column;overflow:hidden">
+
+    <div style="display:flex;align-items:center;gap:8px;height:38px;padding:0 14px">
+      <span style="width:10px;height:10px;border-radius:6px;background:#ff5f57"></span>
+      <span style="width:10px;height:10px;border-radius:6px;background:var(--hover)"></span>
+      <span style="width:10px;height:10px;border-radius:6px;background:var(--hover)"></span>
+    </div>
+
+    <div style="padding:4px 34px 0;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <svg width="60" height="60" viewBox="0 0 56 56">
+        <rect width="56" height="56" rx="14" fill="var(--accent)"/>
+        <rect x="13" y="15" width="19" height="4.4" rx="2.2" fill="#fff"/>
+        <rect x="13" y="25.8" width="26" height="4.4" rx="2.2" fill="#fff" opacity=".78"/>
+        <rect x="13" y="36.6" width="14" height="4.4" rx="2.2" fill="#fff" opacity=".55"/>
+        <path d="M36.5 34.6 41.5 39l-5 4.4" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="font-size:19px;font-weight:600;letter-spacing:-.02em">还差 1 项授权</div>
+    </div>
+
+    <div style="padding:20px 30px 0;display:flex;flex-direction:column;gap:8px">
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(40,165,76,.16);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3.4 8.4 6.4 11.4 12.6 5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">辅助功能</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来读取当前是不是文件面板、以及改面板尺寸">已授权</span>
+        </span>
+        <span style="flex:1"></span>
+      </div>
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(40,165,76,.16);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3.4 8.4 6.4 11.4 12.6 5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">输入监控</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来收 ⌥双击 和 ⌘G；QuickBar 不记录也不上传任何按键">已授权</span>
+        </span>
+        <span style="flex:1"></span>
+      </div>
+
+      <div class="card" style="display:flex;align-items:center;gap:11px;height:52px;padding:0 14px;border-color:var(--warn)">
+        <span style="width:26px;height:26px;border-radius:7px;background:rgba(224,140,26,.18);display:grid;place-items:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 4.2v4.4" stroke="var(--warn)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1.1" fill="var(--warn)"/></svg>
+        </span>
+        <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <span style="font-size:13px">自动化 · Finder</span>
+          <span style="font-size:11px;color:var(--fg2)" title="用来读「Finder 最前窗口在哪个文件夹」，⌘G 靠它">未授权</span>
+        </span>
+        <span style="flex:1"></span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 14px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:500">去授权</span>
+      </div>
+
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:0 30px 24px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;background:var(--accent);flex:none">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3.6 8.4 6.4 11.2 12.4 5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span style="font-size:12.5px;color:var(--fg2)">开机自动启动</span>
+      <span style="flex:1"></span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 16px;border-radius:7px;background:var(--field);border:.5px solid var(--field-brd);font-size:12.5px;color:var(--fg2)">稍后</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 18px;border-radius:7px;background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:500;opacity:.4" title="三项都授权后才可用">开始使用</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark": {"editor": "boolean", "default": true, "section": "外观"}, "$preview": {"width": 560, "height": 540}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? 'qb dark' : 'qb' };
+  }
+}
+</script>
+</body>
+</html>

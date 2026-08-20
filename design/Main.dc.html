@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:13px;letter-spacing:-0.01em}
+    a{color:#0a6cff}
+    a:hover{color:#0850c4}
+    .qb a{color:var(--accent)}
+    .qb{
+      --wall-a:#b9c6d4;--wall-b:#e4dcd1;--wall-c:#8fa3b8;
+      --glass:rgba(249,249,251,.78);--glass-brd:rgba(0,0,0,.10);--glass-top:rgba(255,255,255,.7);
+      --win:#f5f5f7;--win-brd:rgba(0,0,0,.13);--side:rgba(237,237,241,.72);--bar:rgba(246,246,248,.88);
+      --fg:#17171a;--fg2:#77777f;--fg3:#a9a9b1;
+      --sep:rgba(0,0,0,.08);--hover:rgba(0,0,0,.05);
+      --accent:#0a6cff;--accent-soft:rgba(10,108,255,.13);--on-accent:#fff;
+      --field:rgba(255,255,255,.92);--field-brd:rgba(0,0,0,.14);
+      --ok:#28a54c;--warn:#e08c1a;
+      --shadow:0 24px 56px rgba(18,20,26,.28),0 2px 6px rgba(18,20,26,.14);
+      color:var(--fg);
+    }
+    .qb.dark{
+      --wall-a:#2a3542;--wall-b:#3b352d;--wall-c:#161c25;
+      --glass:rgba(45,45,50,.8);--glass-brd:rgba(255,255,255,.13);--glass-top:rgba(255,255,255,.12);
+      --win:#1f1f23;--win-brd:rgba(255,255,255,.11);--side:rgba(37,37,42,.74);--bar:rgba(40,40,45,.88);
+      --fg:#f2f2f5;--fg2:#9b9ba3;--fg3:#6d6d76;
+      --sep:rgba(255,255,255,.085);--hover:rgba(255,255,255,.07);
+      --accent:#3b82ff;--accent-soft:rgba(59,130,255,.2);--on-accent:#fff;
+      --field:rgba(255,255,255,.07);--field-brd:rgba(255,255,255,.14);
+      --ok:#35c25f;--warn:#f0a63c;
+      --shadow:0 28px 64px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.45);
+    }
+    .wall{position:absolute;inset:0;background:
+      radial-gradient(90% 70% at 16% 8%, var(--wall-b) 0%, transparent 58%),
+      radial-gradient(80% 65% at 88% 14%, var(--wall-a) 0%, transparent 62%),
+      linear-gradient(158deg, var(--wall-c) 0%, var(--wall-a) 52%, var(--wall-b) 100%)}
+    .row{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:7px}
+    .grp{font-size:10.5px;font-weight:600;color:var(--fg3);padding:8px 9px 3px;letter-spacing:.02em}
+    .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:4px;background:var(--hover);color:var(--fg2);font-size:10.5px;font-weight:500}
+    .nm{font-size:13px;white-space:nowrap}
+    .pt{font-size:11px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:158px}
+    .sec{font-size:11px;font-weight:600;color:var(--fg2);padding:0 0 8px 2px}
+    .card{background:var(--field);border:.5px solid var(--field-brd);border-radius:9px}
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="position:relative;width:720px;height:480px;overflow:hidden">
+  <div class="wall"></div>
+
+  <!-- 触发点：⌥ + 双击 -->
+  <div style="position:absolute;left:236px;top:136px;width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);box-shadow:0 0 0 6px rgba(255,255,255,.12)"></div>
+  <div style="position:absolute;left:206px;top:110px;display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:rgba(20,22,28,.62);color:#fff;font-size:11px;font-weight:600;backdrop-filter:blur(10px)">
+    <span>⌥</span><span style="opacity:.6">+</span><span>双击</span>
+  </div>
+  <svg width="20" height="26" viewBox="0 0 20 26" style="position:absolute;left:247px;top:147px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">
+    <path d="M2 1.5 2 20.5 7 16 10.4 23.5 13.6 22 10.2 14.8 17 14.5Z" fill="#fff" stroke="#1b1b1f" stroke-width="1.4" stroke-linejoin="round"/>
+  </svg>
+
+  <!-- 快捷条 -->
+  <div style="position:absolute;left:262px;top:160px;width:298px;border-radius:14px;background:var(--glass);backdrop-filter:blur(34px) saturate(1.8);-webkit-backdrop-filter:blur(34px) saturate(1.8);border:.5px solid var(--glass-brd);box-shadow:var(--shadow);overflow:hidden">
+    <div style="height:1px;background:var(--glass-top)"></div>
+
+    <!-- 上下文：一行结论 -->
+    <div style="display:flex;align-items:center;gap:6px;padding:9px 11px 7px" title="快捷条会跟随当前上下文改变动作：在桌面/Finder 时是「打开」，在上传或保存窗时变成「跳转到此」">
+      <svg width="13" height="13" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+      <span style="font-size:11.5px;color:var(--fg2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Finder · 项目素材</span>
+      <span style="font-size:11px;color:var(--fg3);font-weight:500">打开</span>
+    </div>
+
+    <!-- 筛选 -->
+    <div style="padding:0 9px 4px">
+      <div style="display:flex;align-items:center;gap:6px;height:27px;padding:0 9px;border-radius:8px;background:var(--field);border:.5px solid var(--field-brd)">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="flex:none"><circle cx="7" cy="7" r="4.6" stroke="var(--fg3)" stroke-width="1.5"/><path d="M10.6 10.6 14 14" stroke="var(--fg3)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span style="font-size:12.5px;color:var(--fg3)">筛选</span>
+      </div>
+    </div>
+
+    <div style="padding:0 7px 6px">
+      <div class="grp">文件夹</div>
+
+      <div class="row" style="background:var(--accent);color:var(--on-accent)">
+        <svg width="18" height="18" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#fff" fill-opacity=".55"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#fff" fill-opacity=".9"/></svg>
+        <span class="nm">项目素材</span>
+        <span style="flex:1"></span>
+        <span class="pt" style="color:rgba(255,255,255,.72)">~/Work/素材库</span>
+      </div>
+
+      <div class="row">
+        <svg width="18" height="18" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+        <span class="nm">秋季新品</span>
+        <span style="flex:1"></span>
+        <span class="pt">~/Work</span>
+      </div>
+
+      <div class="row">
+        <svg width="18" height="18" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+        <span class="nm">待上传</span>
+        <span style="flex:1"></span>
+        <span class="pt">~/Work</span>
+      </div>
+
+      <div class="row">
+        <svg width="18" height="18" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+        <span class="nm">下载</span>
+        <span style="flex:1"></span>
+        <span class="pt">~/Downloads</span>
+      </div>
+
+      <div class="grp">应用</div>
+
+      <div class="row">
+        <span style="width:18px;height:18px;border-radius:5px;background:#4f7fd4;color:#fff;display:grid;place-items:center;font-size:9.5px;font-weight:700;flex:none">Ch</span>
+        <span class="nm">Chrome</span>
+        <span style="width:5px;height:5px;border-radius:3px;background:var(--fg3);flex:none" title="已在运行 — 点击切到前台，不会新开一个"></span>
+        <span style="flex:1"></span>
+        <span class="pt">切到前台</span>
+      </div>
+
+      <div class="row">
+        <span style="width:18px;height:18px;border-radius:5px;background:#6b6f78;color:#fff;display:grid;place-items:center;font-size:9.5px;font-weight:700;flex:none">Ps</span>
+        <span class="nm">Photoshop</span>
+        <span style="flex:1"></span>
+        <span class="pt">启动</span>
+      </div>
+
+      <div class="row">
+        <span style="width:18px;height:18px;border-radius:5px;background:#3b3f47;color:#fff;display:grid;place-items:center;font-size:9.5px;font-weight:700;flex:none">&gt;_</span>
+        <span class="nm">终端</span>
+        <span style="width:5px;height:5px;border-radius:3px;background:var(--fg3);flex:none" title="已在运行 — 点击切到前台"></span>
+        <span style="flex:1"></span>
+        <span class="pt">切到前台</span>
+      </div>
+    </div>
+
+    <!-- 底栏 -->
+    <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-top:.5px solid var(--sep)">
+      <span class="kbd">↑↓</span>
+      <span class="kbd">↩</span>
+      <span style="font-size:11px;color:var(--fg3)">打开</span>
+      <span style="flex:1"></span>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="opacity:.5" title="设置">
+        <circle cx="8" cy="8" r="2.4" stroke="var(--fg2)" stroke-width="1.4"/>
+        <path d="M8 1.4v1.9M8 12.7v1.9M14.6 8h-1.9M3.3 8H1.4M12.7 3.3l-1.4 1.4M4.7 11.3l-1.4 1.4M12.7 12.7l-1.4-1.4M4.7 4.7 3.3 3.3" stroke="var(--fg2)" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark": {"editor": "boolean", "default": false, "section": "外观"}, "$preview": {"width": 720, "height": 480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? 'qb dark' : 'qb' };
+  }
+}
+</script>
+</body>
+</html>

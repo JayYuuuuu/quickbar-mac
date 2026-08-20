@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:13px;letter-spacing:-0.01em}
+    a{color:#0a6cff}
+    a:hover{color:#0850c4}
+    .qb a{color:var(--accent)}
+    .qb{
+      --wall-a:#b9c6d4;--wall-b:#e4dcd1;--wall-c:#8fa3b8;
+      --glass:rgba(249,249,251,.78);--glass-brd:rgba(0,0,0,.10);--glass-top:rgba(255,255,255,.7);
+      --win:#f5f5f7;--win-brd:rgba(0,0,0,.13);--side:rgba(237,237,241,.72);--bar:rgba(246,246,248,.88);
+      --fg:#17171a;--fg2:#77777f;--fg3:#a9a9b1;
+      --sep:rgba(0,0,0,.08);--hover:rgba(0,0,0,.05);
+      --accent:#0a6cff;--accent-soft:rgba(10,108,255,.13);--on-accent:#fff;
+      --field:rgba(255,255,255,.92);--field-brd:rgba(0,0,0,.14);
+      --ok:#28a54c;--warn:#e08c1a;
+      --shadow:0 24px 56px rgba(18,20,26,.28),0 2px 6px rgba(18,20,26,.14);
+      color:var(--fg);
+    }
+    .qb.dark{
+      --wall-a:#2a3542;--wall-b:#3b352d;--wall-c:#161c25;
+      --glass:rgba(45,45,50,.8);--glass-brd:rgba(255,255,255,.13);--glass-top:rgba(255,255,255,.12);
+      --win:#1f1f23;--win-brd:rgba(255,255,255,.11);--side:rgba(37,37,42,.74);--bar:rgba(40,40,45,.88);
+      --fg:#f2f2f5;--fg2:#9b9ba3;--fg3:#6d6d76;
+      --sep:rgba(255,255,255,.085);--hover:rgba(255,255,255,.07);
+      --accent:#3b82ff;--accent-soft:rgba(59,130,255,.2);--on-accent:#fff;
+      --field:rgba(255,255,255,.07);--field-brd:rgba(255,255,255,.14);
+      --ok:#35c25f;--warn:#f0a63c;
+      --shadow:0 28px 64px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.45);
+    }
+    .wall{position:absolute;inset:0;background:
+      radial-gradient(90% 70% at 16% 8%, var(--wall-b) 0%, transparent 58%),
+      radial-gradient(80% 65% at 88% 14%, var(--wall-a) 0%, transparent 62%),
+      linear-gradient(158deg, var(--wall-c) 0%, var(--wall-a) 52%, var(--wall-b) 100%)}
+    .row{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:7px}
+    .grp{font-size:10.5px;font-weight:600;color:var(--fg3);padding:8px 9px 3px;letter-spacing:.02em}
+    .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:4px;background:var(--hover);color:var(--fg2);font-size:10.5px;font-weight:500}
+    .nm{font-size:13px;white-space:nowrap}
+    .pt{font-size:11px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:158px}
+    .sec{font-size:11px;font-weight:600;color:var(--fg2);padding:0 0 8px 2px}
+    .card{background:var(--field);border:.5px solid var(--field-brd);border-radius:9px}
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="position:relative;width:760px;height:560px;overflow:hidden">
+  <div class="wall" style="opacity:.85"></div>
+
+  <div style="position:absolute;left:30px;top:28px;width:700px;height:504px;border-radius:12px;background:var(--win);border:.5px solid var(--win-brd);box-shadow:0 26px 60px rgba(0,0,0,.34);display:flex;overflow:hidden">
+
+    <!-- 侧栏 -->
+    <div style="width:172px;background:var(--side);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-right:.5px solid var(--sep);display:flex;flex-direction:column;padding:0 8px 8px">
+      <div style="display:flex;align-items:center;gap:8px;height:44px;padding:0 4px">
+        <span style="width:9px;height:9px;border-radius:5px;background:#ff5f57"></span>
+        <span style="width:9px;height:9px;border-radius:5px;background:#febc2e"></span>
+        <span style="width:9px;height:9px;border-radius:5px;background:#28c840"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">
+        <div class="row" style="height:30px;background:var(--accent);color:var(--on-accent)">
+          <span style="width:19px;height:19px;border-radius:5px;background:rgba(255,255,255,.28);display:grid;place-items:center;flex:none">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2.5 4.6c0-.7.56-1.26 1.25-1.26h2.3c.33 0 .65.13.88.37l.6.6c.24.23.56.37.89.37h4.33c.69 0 1.25.56 1.25 1.25v5.9c0 .7-.56 1.26-1.25 1.26H3.75c-.69 0-1.25-.56-1.25-1.25z" fill="#fff"/></svg>
+          </span>
+          <span style="font-size:12.5px">条目</span>
+        </div>
+        <div class="row" style="height:30px">
+          <span style="width:19px;height:19px;border-radius:5px;background:#8a6cd4;display:grid;place-items:center;flex:none;color:#fff;font-size:10px;font-weight:700">⌥</span>
+          <span style="font-size:12.5px">触发</span>
+        </div>
+        <div class="row" style="height:30px">
+          <span style="width:19px;height:19px;border-radius:5px;background:#d4913f;display:grid;place-items:center;flex:none">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M8 1.8 13.2 4v3.7c0 3.2-2.1 5.6-5.2 6.5-3.1-.9-5.2-3.3-5.2-6.5V4z" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </span>
+          <span style="font-size:12.5px">权限</span>
+          <span style="flex:1"></span>
+          <span style="width:6px;height:6px;border-radius:4px;background:var(--warn)" title="有 1 项权限未授权"></span>
+        </div>
+        <div class="row" style="height:30px">
+          <span style="width:19px;height:19px;border-radius:5px;background:#7c828c;display:grid;place-items:center;flex:none">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="#fff" stroke-width="1.5"/><path d="M8 1.6v1.8M8 12.6v1.8M14.4 8h-1.8M3.4 8H1.6M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3M12.5 12.5l-1.3-1.3M4.8 4.8 3.5 3.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </span>
+          <span style="font-size:12.5px">通用</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内容 -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-bottom:.5px solid var(--sep)">
+        <span style="font-size:13px;font-weight:600">条目</span>
+        <span style="font-size:11.5px;color:var(--fg2)" title="快捷条按这个顺序显示；拖动左侧手柄可以排序">9 个文件夹 · 4 个应用</span>
+        <span style="flex:1"></span>
+        <div style="display:flex;align-items:center;gap:6px;width:150px;height:24px;padding:0 9px;border-radius:7px;background:var(--field);border:.5px solid var(--field-brd)">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.6" stroke="var(--fg3)" stroke-width="1.5"/><path d="M10.6 10.6 14 14" stroke="var(--fg3)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span style="font-size:11.5px;color:var(--fg3)">搜索</span>
+        </div>
+      </div>
+
+      <div style="flex:1;overflow:hidden;padding:6px 10px">
+        <div class="grp" style="padding:6px 8px 4px">文件夹</div>
+
+        <div class="row" style="height:36px;background:var(--hover)">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.45"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <svg width="19" height="19" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+          <span style="font-size:13px">项目素材</span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">~/Work/素材库</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--field);border:.5px solid var(--field-brd)" title="在 Finder 中显示">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M9.5 2.5H13v3.5M13 2.5 7.5 8" stroke="var(--fg2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.4 9.6v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V4.7a1 1 0 0 1 1-1h3" stroke="var(--fg2)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--field);border:.5px solid var(--field-brd)" title="移除这个条目">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--fg2)" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </span>
+        </div>
+
+        <div class="row" style="height:36px">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.28"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <svg width="19" height="19" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+          <span style="font-size:13px">秋季新品</span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">~/Work</span>
+        </div>
+
+        <div class="row" style="height:36px">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.28"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <svg width="19" height="19" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+          <span style="font-size:13px">待上传</span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">~/Work/待上传</span>
+        </div>
+
+        <div class="row" style="height:36px">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.28"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <svg width="19" height="19" viewBox="0 0 20 20" style="flex:none"><path d="M2 5.9c0-.94.76-1.7 1.7-1.7h3.2c.45 0 .88.18 1.2.5l.85.85c.32.32.75.5 1.2.5h6.1c.94 0 1.7.76 1.7 1.7v.55H2z" fill="#7fb4ff"/><path d="M2 7.6h16v6.5c0 .94-.76 1.7-1.7 1.7H3.7c-.94 0-1.7-.76-1.7-1.7z" fill="#3d8ffd"/></svg>
+          <span style="font-size:13px">下载</span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">~/Downloads</span>
+        </div>
+
+        <div class="grp" style="padding:12px 8px 4px">应用</div>
+
+        <div class="row" style="height:36px">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.28"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <span style="width:19px;height:19px;border-radius:5px;background:#4f7fd4;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none">Ch</span>
+          <span style="font-size:13px">Chrome</span>
+          <span style="width:5px;height:5px;border-radius:3px;background:var(--ok);flex:none" title="已在运行"></span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">/Applications/Google Chrome.app</span>
+        </div>
+
+        <div class="row" style="height:36px">
+          <svg width="12" height="16" viewBox="0 0 12 16" style="flex:none;opacity:.28"><circle cx="4" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="4" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="8" r="1.2" fill="var(--fg2)"/><circle cx="4" cy="12" r="1.2" fill="var(--fg2)"/><circle cx="8" cy="12" r="1.2" fill="var(--fg2)"/></svg>
+          <span style="width:19px;height:19px;border-radius:5px;background:#6b6f78;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none">Ps</span>
+          <span style="font-size:13px">Photoshop</span>
+          <span style="flex:1"></span>
+          <span class="pt" style="max-width:210px">/Applications/Adobe Photoshop 2026</span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:.5px solid var(--sep)">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:6px 0 0 6px;background:var(--field);border:.5px solid var(--field-brd);font-size:14px;color:var(--fg2)" title="添加文件夹或应用">+</span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:0 6px 6px 0;background:var(--field);border:.5px solid var(--field-brd);border-left:none;margin-left:-6px;font-size:14px;color:var(--fg3)">−</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px;color:var(--fg3)" title="也可以把文件夹或 .app 直接拖进这个列表">拖入即添加</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark": {"editor": "boolean", "default": false, "section": "外观"}, "$preview": {"width": 760, "height": 560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? 'qb dark' : 'qb' };
+  }
+}
+</script>
+</body>
+</html>
