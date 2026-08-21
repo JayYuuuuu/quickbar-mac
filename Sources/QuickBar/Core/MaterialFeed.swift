@@ -20,6 +20,17 @@ final class MaterialFeed {
     /// 服务器地址。团队只有这一台，写死比让每个人填一遍靠谱。
     private static let server = "https://ai.yujiev.com:8444"
 
+    /// 内置口令。**不在源码里**——仓库是公开的，值由 `build.sh` 构建时写进 Info.plist
+    /// （来源见那儿：`QUICKBAR_MATERIAL_KEY` 或 `~/.quickbar-material-key`）。
+    /// 没内置的包（比如别人 clone 下来自己编的）这里是空的，设置页就会露出「密码」那一栏。
+    static let builtInKey = (Bundle.main.object(forInfoDictionaryKey: "QuickBarMaterialKey") as? String) ?? ""
+
+    /// 实际用的口令：设置里手填的优先，方便服务端换了口令而新版还没发出去时自己顶上。
+    static var apiKey: String {
+        let typed = Store.shared.settings.materialFeedKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? builtInKey : typed
+    }
+
     /// 🔴 缓存的是批次本身，不是渲染好的条目：`detail` 里「今天只报时分」的判断跟当前日期有关，
     /// 存渲染结果的话跨夜就定死了——昨天的批次会一直显示成只有时分，看不出是昨天。
     private var batches: [MaterialBatch] = []
@@ -99,8 +110,7 @@ final class MaterialFeed {
     }
 
     private var isConfigured: Bool {
-        let s = Store.shared.settings
-        return s.materialFeedEnabled && !s.materialFeedKey.isEmpty
+        Store.shared.settings.materialFeedEnabled && !Self.apiKey.isEmpty
     }
 
     // MARK: - 拉取
@@ -115,7 +125,7 @@ final class MaterialFeed {
         lastFetchAt = Date()
 
         var request = URLRequest(url: url)
-        request.setValue(Store.shared.settings.materialFeedKey, forHTTPHeaderField: "X-API-Key")
+        request.setValue(Self.apiKey, forHTTPHeaderField: "X-API-Key")
         request.setValue("QuickBar/\(Updater.shared.currentVersion)", forHTTPHeaderField: "User-Agent")
 
         session.dataTask(with: request) { [weak self] data, response, error in

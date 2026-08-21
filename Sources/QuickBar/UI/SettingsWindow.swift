@@ -449,8 +449,9 @@ private struct PermissionRow: View {
 
 /// 对接「AI 电商内容助手」的素材下载单：把最近派的批次目录直接摆到快捷条上。
 ///
-/// 界面上只有一个密码要填（服务器地址内置，见 MaterialFeed.server）。填错什么、
-/// 连不通什么，全压在底下那一行状态里，不在界面上铺说明——真要解释的进 help tip。
+/// 界面上什么都不用填：服务器地址写死在 MaterialFeed.server，口令由 build.sh
+/// 构建时内置（见 MaterialFeed.builtInKey）。连不通什么全压在底下那一行状态里，
+/// 不在界面上铺说明——真要解释的进 help tip。
 private struct MaterialPane: View {
     @ObservedObject var store: Store
     @State private var status = MaterialFeed.shared.statusText
@@ -465,15 +466,19 @@ private struct MaterialPane: View {
                 ))
                 .help("素材落在 <采集根>/<品牌>/<时间戳_批次>/，每派一单就换一个新目录，手工加书签跟不上，所以由服务器喂。")
 
+                // 正常发布的包口令是构建时内置的，这一栏根本不出现——少一处能填错的地方。
+                // 只有自己编的、没内置口令的包才需要手填。
                 // 逐字符触发同步会在打字过程中发一串必然 401 的请求，所以只在回车时才试；
                 // 不按回车也行，底下「立即同步」是同一个动作。
-                SecureField("密码", text: Binding(
-                    get: { store.settings.materialFeedKey },
-                    set: { store.settings.materialFeedKey = $0 }
-                ))
-                .disabled(!store.settings.materialFeedEnabled)
-                .onSubmit { MaterialFeed.shared.start() }
-                .help("团队内部那一串。它只能读「批次落在哪个目录、下完没有」，派单、重下、回写都够不着。")
+                if MaterialFeed.builtInKey.isEmpty {
+                    SecureField("密码", text: Binding(
+                        get: { store.settings.materialFeedKey },
+                        set: { store.settings.materialFeedKey = $0 }
+                    ))
+                    .disabled(!store.settings.materialFeedEnabled)
+                    .onSubmit { MaterialFeed.shared.start() }
+                    .help("团队内部那一串。它只能读「批次落在哪个目录、下完没有」，派单、重下、回写都够不着。")
+                }
 
                 Toggle("下完了通知我", isOn: Binding(
                     get: { store.settings.materialFeedNotify },

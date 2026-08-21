@@ -130,7 +130,9 @@ struct Settings: Codable {
     // 素材批次（对接 AI 电商内容助手的素材下载单，见 Core/MaterialFeed.swift）。
     // 服务器地址写死在 MaterialFeed 里，不做成设置项——它只有一个值，
     // 摆出来只会多一处能填错的地方，还得配一句解释。
-    var materialFeedEnabled: Bool = false
+    var materialFeedEnabled: Bool = true
+    /// 手填的口令。正常发布的包不用填——口令由 build.sh 内置在 Info.plist 里，
+    /// 见 MaterialFeed.builtInKey。这里非空就优先用这里的。
     var materialFeedKey: String = ""
     var materialFeedNotify: Bool = true
 
@@ -191,9 +193,31 @@ final class Store: ObservableObject {
         } else {
             items = Store.defaultItems()
         }
-        if let d = try? Data(contentsOf: settingsURL), let v = try? dec.decode(Settings.self, from: d) {
+        if let d = try? Data(contentsOf: settingsURL), let v = Store.decodeSettings(d) {
             settings = v
         }
+    }
+
+    /// 🔴 老的 `settings.json` 必然缺新版本加的键，而 Swift 合成的 `Decodable`
+    /// **碰到缺键会整个抛错**——哪怕那个属性写着默认值（实测 `keyNotFound`）。
+    /// 外面再 `try?` 一兜，结果就是每加一个设置项，所有老用户的设置被悄悄清空一次：
+    /// 1.6.0 加了三个键，触发方式、素材批次口令、记住的面板尺寸当场全没。
+    ///
+    /// 所以不能直接 decode：先把一份默认值编成 JSON，再把磁盘上那份盖上去，
+    /// 缺什么补什么。以后再加键也不用管这里。
+    ///
+    /// （条目那边同理——给 `QuickItem` 加字段只能加 Optional 的，否则老 `items.json`
+    /// 解不开会被换成一套默认条目。）
+    private static func decodeSettings(_ data: Data) -> Settings? {
+        let dec = JSONDecoder()
+        guard let onDisk = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let encoded = try? JSONEncoder().encode(Settings()),
+              var merged = (try? JSONSerialization.jsonObject(with: encoded)) as? [String: Any]
+        else { return try? dec.decode(Settings.self, from: data) }
+
+        for (key, value) in onDisk { merged[key] = value }
+        guard let patched = try? JSONSerialization.data(withJSONObject: merged) else { return nil }
+        return try? dec.decode(Settings.self, from: patched)
     }
 
     private func scheduleSave() {

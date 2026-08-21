@@ -47,6 +47,18 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
 
 家里 / 外网的机器解析到公网 IP，不碰这道坎，一切正常 —— 两台机器的差异全在这。
 
+## 🔴 给 Settings 加字段：别指望 Swift 的默认值兜底
+
+`struct Settings: Codable` 里写了默认值 **不代表**缺键能解出来。Swift 合成的
+`Decodable` 碰到缺失的键直接抛 `keyNotFound`（2026-08-21 实测），而 `Store.load()`
+外面是 `try?` —— 于是**每加一个设置项，所有老用户的 settings.json 就被整份清空一次**。
+1.6.0 加了三个键，触发方式、素材批次口令、记住的面板尺寸当场全没，用户是看到
+「怎么变成关了」才发现的。
+
+现在 `Store.decodeSettings` 先把一份默认值编成 JSON，再把磁盘那份盖上去，缺什么补什么，
+以后加键不用管。但 **`QuickItem` 还是裸的**：给它加字段只能加 Optional 的，
+否则老 `items.json` 解不开会被换成一套默认条目。
+
 ## 其它
 
 - **本地开发版会被自动更新器换掉**：`./build.sh` 出的是 `0.0.0-dev`，已加护栏（版本含 `dev` 不参与
