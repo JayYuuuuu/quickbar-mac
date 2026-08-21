@@ -53,14 +53,14 @@ struct QuickItem: Codable, Identifiable, Hashable {
 // MARK: - 触发方式
 
 enum TriggerMode: String, Codable, CaseIterable {
-    /// 修饰键 + 双击（默认，零误触发）
+    /// 连按两下 ⌘，完全不碰鼠标事件（默认）
+    case doubleCommand
+    /// 修饰键 + 双击，零误触发
     case modifierDoubleClick
     /// 只在桌面空白处双击
     case desktopDoubleClick
     /// 裸双击任意位置（会误触发，靠排除名单缓解）
     case bareDoubleClick
-    /// 连按两下 ⌘，完全不碰鼠标事件
-    case doubleCommand
 
     var label: String {
         switch self {
@@ -110,7 +110,7 @@ enum TriggerModifier: String, Codable, CaseIterable {
 // MARK: - 偏好设置
 
 struct Settings: Codable {
-    var trigger: TriggerMode = .modifierDoubleClick
+    var trigger: TriggerMode = .doubleCommand
     var modifier: TriggerModifier = .option
     /// 裸双击模式下不触发的应用 bundle id。
     var excludedBundleIDs: [String] = []
