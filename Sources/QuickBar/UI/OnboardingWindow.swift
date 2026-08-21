@@ -28,7 +28,7 @@ struct OnboardingView: View {
     @State private var granted: Set<Permissions.Kind> = []
     private let heartbeat = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    private var missingCount: Int { Permissions.Kind.allCases.count - granted.count }
+    private var missingCount: Int { Permissions.Kind.core.count - granted.count }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +40,7 @@ struct OnboardingView: View {
             .padding(.top, 8)
 
             VStack(spacing: 8) {
-                ForEach(Permissions.Kind.allCases) { kind in
+                ForEach(Permissions.Kind.core) { kind in
                     PermissionCard(kind: kind, granted: granted.contains(kind))
                 }
             }
@@ -70,7 +70,7 @@ struct OnboardingView: View {
     }
 
     private func refresh() {
-        granted = Set(Permissions.Kind.allCases.filter { Permissions.isGranted($0) })
+        granted = Set(Permissions.Kind.core.filter { Permissions.isGranted($0) })
     }
 }
 

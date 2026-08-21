@@ -67,7 +67,8 @@ struct SettingsView: View {
                     SidebarRow(
                         section: item,
                         selected: section == item,
-                        warning: item == .permissions && !missingPermissions.isEmpty
+                        // 只有必需的三项缺了才点橙点；通知是可选的，不该常驻一个警告。
+                        warning: item == .permissions && missingPermissions.contains { $0.isRequired }
                     ) { section = item }
                 }
                 Spacer()
@@ -415,7 +416,7 @@ private struct PermissionsPane: View {
             } header: {
                 Text("权限")
             } footer: {
-                Text(missing.isEmpty ? "三项都在，功能完整。" : "缺少授权时相关功能会静默降级，不会报错打断你。")
+                Text(missing.isEmpty ? "都到齐了，功能完整。" : "缺少授权时相关功能会静默降级，不会报错打断你。")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -427,16 +428,19 @@ private struct PermissionRow: View {
     let kind: Permissions.Kind
     let granted: Bool
 
+    /// 可选授权（通知）缺了只是灰的，不是橙的——颜色本身就是「这算不算坏」。
+    private var missingTint: Color { kind.isRequired ? .orange : .secondary }
+
     var body: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(granted ? Color.green : Color.orange)
+                .fill(granted ? Color.green : missingTint)
                 .frame(width: 7, height: 7)
             Text(kind.title)
             Spacer()
             Text(granted ? "已授权" : "未授权")
                 .font(.caption)
-                .foregroundStyle(granted ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.orange))
+                .foregroundStyle(granted ? AnyShapeStyle(.secondary) : AnyShapeStyle(missingTint))
                 .help(kind.why)
             if !granted {
                 Button("授权") { Permissions.request(kind) }

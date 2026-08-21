@@ -51,7 +51,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         settings.keyEquivalent = ","
         menu.addItem(settings)
 
-        let missing = Permissions.Kind.allCases.filter { !Permissions.isGranted($0) }
+        // 只数必需的三项：通知没给不算「还差授权」，那是设置页里的事。
+        let missing = Permissions.Kind.core.filter { !Permissions.isGranted($0) }
         let permissions = item(missing.isEmpty ? "权限正常" : "还差 \(missing.count) 项授权",
                                action: #selector(openPermissions))
         permissions.image = dot(color: missing.isEmpty ? .systemGreen : .systemOrange)
