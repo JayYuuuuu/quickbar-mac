@@ -120,6 +120,8 @@ struct Settings: Codable {
     var jumpModifierFlags: UInt = UInt(CGEventFlags.maskCommand.rawValue)
 
     var rememberPanelSize: Bool = true
+    /// 新开的 Finder 窗口沿用记住的尺寸。见 Core/FinderWindowService.swift。
+    var rememberFinderWindowSize: Bool = true
     var launchAtLogin: Bool = true
 
     var autoUpdate: Bool = true
@@ -141,6 +143,21 @@ struct Settings: Codable {
         set {
             panelWidth = Double(newValue?.width ?? 0)
             panelHeight = Double(newValue?.height ?? 0)
+        }
+    }
+
+    /// 记住的 Finder 窗口尺寸（全局一份）。
+    var finderWindowWidth: Double = 0
+    var finderWindowHeight: Double = 0
+
+    var finderWindowSize: CGSize? {
+        get {
+            finderWindowWidth > 400 && finderWindowHeight > 300
+                ? CGSize(width: finderWindowWidth, height: finderWindowHeight) : nil
+        }
+        set {
+            finderWindowWidth = Double(newValue?.width ?? 0)
+            finderWindowHeight = Double(newValue?.height ?? 0)
         }
     }
 }

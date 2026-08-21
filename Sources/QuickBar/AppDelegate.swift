@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         FinderService.shared.start()
+        FinderWindowService.shared.start()
         Availability.shared.start()
         // 点素材批次的完成通知要能直接开那个文件夹，所以委托得在 MaterialFeed 起来之前装好。
         if Bundle.main.bundleIdentifier != nil {
@@ -80,12 +81,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     // MARK: - 动作
 
     private func jumpToFinder() {
-        let path = FinderService.shared.refresh()
-        if PanelService.shared.currentPanel() != nil {
-            PanelService.shared.jump(to: path)
-        } else {
-            Actions.openFolder(path)
+        let folder = FinderService.shared.refresh()
+        guard let panel = PanelService.shared.currentPanel() else {
+            Actions.openFolder(folder)
+            return
         }
+        // 打开窗：Finder 里正好只选中一个文件，就直接跳到那个文件。
+        // 「前往文件夹」吃完整文件路径，落地就是选中状态（macOS 26 实测），
+        // 省掉在长列表里再找一次。
+        // 保存窗不这么干：文件路径会被填进名字栏，等于默认覆盖同名文件。
+        let target = (panel.kind == .open ? FinderService.shared.currentSelection : nil) ?? folder
+        PanelService.shared.jump(to: target)
     }
 
     private func toggleTrigger() {

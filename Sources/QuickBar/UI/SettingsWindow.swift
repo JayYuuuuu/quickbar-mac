@@ -535,6 +535,17 @@ private struct GeneralPane: View {
                 }
             }
 
+            Section("Finder 窗口") {
+                Toggle("新窗口沿用记住的尺寸", isOn: $store.settings.rememberFinderWindowSize)
+                    .help("Finder 的尺寸按文件夹逐个记在 .DS_Store 里，新建的目录和网络卷上的目录没有记录，一律开成 960×492。开着就在这种窗口出现时改成你最后拉过的尺寸，别的尺寸不碰。")
+                if let size = store.settings.finderWindowSize {
+                    LabeledContent("当前记住的尺寸", value: "\(Int(size.width)) × \(Int(size.height))")
+                } else {
+                    LabeledContent("当前记住的尺寸", value: "还没有")
+                        .help("手动拉一次 Finder 窗口就记下来了。")
+                }
+            }
+
             Section("更新") {
                 Toggle("自动检查更新", isOn: $store.settings.autoUpdate)
                 Toggle("静默安装，不打断我", isOn: $store.settings.autoUpdateSilently)
