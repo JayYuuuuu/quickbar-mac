@@ -130,11 +130,44 @@ final class MaterialFeed {
 
         session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
-            let outcome = Self.parse(data: data, response: response, error: error)
+            var outcome = Self.parse(data: data, response: response, error: error)
+
             // 目录探测放在后台：路径全在 /Volumes 上，卷没挂时 stat 会卡好几秒。
-            let mounted = Self.mountedVolumes()
-            let resolved = outcome.batches.map { ($0, Availability.probe($0.path, mountedVolumes: mounted)) }
-            DispatchQueue.main.async { self.apply(outcome: outcome, resolved: resolved) }
+            func finish() {
+                let mounted = Self.mountedVolumes()
+                let resolved = outcome.batches.map { ($0, Availability.probe($0.path, mountedVolumes: mounted)) }
+                DispatchQueue.main.async { self.apply(outcome: outcome, resolved: resolved) }
+            }
+
+            // 批次本身没拿到就别再多打一次请求了，直接照原样收尾。
+            guard outcome.error == nil else { finish(); return }
+
+            // 图片空间上传进度是**附加信息**：拿不到就当没有，照常显示批次。
+            // 🔴 绝不能让这一发失败把整个列表打空 —— 那等于用一个锦上添花的功能
+            //    换掉了快捷条最主要的用途。
+            self.fetchUploads { uploads in
+                if !uploads.isEmpty { outcome.batches = MaterialBatch.merge(outcome.batches, uploads: uploads) }
+                finish()
+            }
+        }.resume()
+    }
+
+    /// 拉「这些批次传进图片空间没有」。只读端点，跟批次用同一把口令。
+    /// 失败一律回空数组（不区分原因）——调用方只关心「有没有可显示的进度」。
+    private func fetchUploads(_ done: @escaping ([String: UploadStatusRow]) -> Void) {
+        guard let url = URL(string: Self.server + "/api/tu-upload/quickbar-status?limit=20") else { return done([:]) }
+        var request = URLRequest(url: url)
+        request.setValue(Self.apiKey, forHTTPHeaderField: "X-API-Key")
+        request.setValue("QuickBar/\(Updater.shared.currentVersion)", forHTTPHeaderField: "User-Agent")
+        session.dataTask(with: request) { data, response, _ in
+            guard (response as? HTTPURLResponse)?.statusCode == 200, let data,
+                  let payload = try? JSONDecoder().decode(UploadStatusResponse.self, from: data)
+            else { return done([:]) }
+            var map: [String: UploadStatusRow] = [:]
+            for row in payload.items where !row.key.isEmpty {
+                if map[row.key] == nil { map[row.key] = row }   // 已按时间倒序，第一条就是最新那次
+            }
+            done(map)
         }.resume()
     }
 
@@ -256,6 +289,15 @@ struct MaterialBatch: Codable {
     let progressLabel: String
     let isFinished: Bool
 
+    /// 这批传进淘宝图片空间的进度。
+    /// 🔴 **必须全是 Optional**：老版本缓存的 `material-batches.json` 里没有这几个键，
+    ///    换成非 Optional 会让整份缓存解不开 → 升级后快捷条上的批次**全部消失**，
+    ///    而且要等下一次网络拉取才恢复。（同 CLAUDE.md 里 QuickItem 那条教训。）
+    var uploadStatus: String?
+    var uploadDone: Int?
+    var uploadTotal: Int?
+    var uploadFailed: Int?
+
     init?(row: MaterialFeedRow) {
         let brand = row.brand.trimmingCharacters(in: .whitespaces)
         guard !brand.isEmpty else { return nil }
@@ -306,10 +348,49 @@ struct MaterialBatch: Codable {
     }
 
     /// 右侧那一行：下完了报件数和时间，没下完就把服务端那句进度原样搬过来。
+    /// 正在往图片空间传的时候，这一行**整个让给上传进度**——那是此刻唯一在动的数字，
+    /// 件数和时间戳随时都能再看，而人盯着快捷条就是想知道传到哪儿了。
     var detail: String {
+        if uploadStatus == "running" { return "上传中 \(uploadDone ?? 0)/\(uploadTotal ?? 0)" }
         guard isFinished else { return progressLabel.isEmpty ? "下载中" : progressLabel }
         let stamp = Self.stamp(from: batchDir)
-        return stamp.isEmpty ? "\(itemCount) 件" : "\(itemCount) 件 · \(stamp)"
+        let base = stamp.isEmpty ? "\(itemCount) 件" : "\(itemCount) 件 · \(stamp)"
+        guard let tail = uploadTail else { return base }
+        return "\(base) · \(tail)"
+    }
+
+    /// 图片空间那一小截。
+    /// 🔴 **没派过上传任务就返回 nil**，不写「未上传」：绝大多数批次本来就轮不到传，
+    ///    每行都挂一个否定词只会让真正需要注意的那几行淹掉。
+    var uploadTail: String? {
+        switch uploadStatus {
+        case "pending": return "等着传"
+        case "done":    return "已传"
+        case "partial":
+            let n = uploadFailed ?? 0
+            return n > 0 ? "差 \(n) 张" : "差几张"
+        case "failed":  return "没传上"
+        case "cancelled": return nil     // 撤销了等于没派过，别留痕迹
+        default:        return nil
+        }
+    }
+
+    /// 跟上传记录对上号的钥匙。品牌 + 批次目录两边都来自同一份 source_meta，
+    /// 所以是逐字相等的（`XUZHI` / `XU ZHI` 那种写法漂移在这儿不会碰上：
+    /// 同一条记录的两侧读的是同一个字段）。
+    var uploadKey: String { brand + "\u{0}" + batchDir }
+
+    /// 把上传进度并进批次。查不到的原样返回 —— 不是「没传」，是「没派过」。
+    static func merge(_ batches: [MaterialBatch], uploads: [String: UploadStatusRow]) -> [MaterialBatch] {
+        batches.map { batch in
+            guard let u = uploads[batch.uploadKey] else { return batch }
+            var copy = batch
+            copy.uploadStatus = u.status
+            copy.uploadDone = u.done
+            copy.uploadTotal = u.total
+            copy.uploadFailed = u.failed
+            return copy
+        }
     }
 
     /// `20260820-1305_补素材` → `08-20 13:05`，**今天的只报 `13:05`**。
@@ -349,6 +430,41 @@ struct MaterialBatch: Codable {
 
 struct MaterialFeedResponse: Decodable {
     let items: [MaterialFeedRow]
+}
+
+/// `/api/tu-upload/quickbar-status` 的返回。
+struct UploadStatusResponse: Decodable {
+    let items: [UploadStatusRow]
+}
+
+/// 一条上传任务。字段同样逐个兜默认值 —— 理由见下面 MaterialFeedRow 的说明，
+/// 服务端还在长，不能让它加个字段就把这边打空。
+struct UploadStatusRow: Decodable {
+    let brand: String
+    let batchDir: String
+    let status: String
+    let total: Int
+    let done: Int
+    let failed: Int
+
+    enum CodingKeys: String, CodingKey {
+        case brand, status, total, done, failed
+        case batchDir = "batch_dir"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func string(_ key: CodingKeys) -> String { (try? c.decode(String.self, forKey: key)) ?? "" }
+        func int(_ key: CodingKeys) -> Int { (try? c.decode(Int.self, forKey: key)) ?? 0 }
+        brand = string(.brand)
+        batchDir = string(.batchDir)
+        status = string(.status)
+        total = int(.total)
+        done = int(.done)
+        failed = int(.failed)
+    }
+
+    var key: String { brand + "\u{0}" + batchDir }
 }
 
 /// `/api/listing-source/history` 的一行。
