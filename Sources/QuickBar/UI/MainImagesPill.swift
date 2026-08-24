@@ -42,8 +42,18 @@ final class MainImagesPill {
 
     /// 上一次看到的选中项（用来判"变没变"）。
     private var lastSelection: [String] = []
-    /// 已经点过的那一组：点完不再为同一组选中项弹出来，否则一点完它又冒出来，很容易重复丢一次。
+    /// 已经点过的那一组：点完不再为同一组选中项弹出来 —— 否则手还在那个位置、
+    /// 药丸立刻又冒出来，很容易再点一下把同一批图重复丢进 PS。
+    ///
+    /// 🔴 **这条只该管一小会儿。** 第一版让它一直管到「选中项变了」为止，结果是
+    ///    从 PS 回到访达、那个文件夹还选着，药丸就再也不出来了（用户 2026-08-25 反馈）。
+    ///    现在两个条件任意一个成立就重新武装：**从别的应用回到访达**（那是明确的新回合，
+    ///    也正是「丢进 PS → 改完 → 回来」这条路），或者**过了 20 秒**。
+    ///    不用更短的纯计时是因为 PS 冷启动能要十几秒 —— 那期间药丸弹回来，
+    ///    再点一下 `remaining` 就会多记一遍，计数当场就错了。
     private var actedSelection: [String] = []
+    private var actedAt = Date.distantPast
+    private static let reArm: TimeInterval = 20
     /// 当前这组选中项对应的主图（点下去就开这些的父级路径）。
     private var pending: [String] = []
     private var mode: Mode = .finder
@@ -198,7 +208,14 @@ final class MainImagesPill {
         case "com.apple.finder":
             // 从别处回到 Finder：**忘掉上一次的选中项**，否则「选中项没变」那一条
             // 会让药丸再也不出现（去 PS 改完图回来正是这条路）。
-            if mode != .finder { mode = .finder; lastSelection = []; selectionDirty = true }
+            if mode != .finder {
+                // 从别的应用回到访达 = 新回合：忘掉上一次的选中项（否则「没变」这条
+                // 会让药丸不再出现），也把「点过了」这条解除。
+                mode = .finder
+                lastSelection = []
+                selectionDirty = true
+                actedSelection = []
+            }
             tickFinder()
         case Photoshop.bundleID:
             if mode != .photoshop { mode = .photoshop; hide() }
@@ -255,6 +272,10 @@ final class MainImagesPill {
         }
         selectionDirty = false
         lastFinderProbe = now
+        // 一直待在访达里没走开的话，20 秒之后也放行 —— 不然「点过一次就永远不出来」。
+        if !actedSelection.isEmpty, now.timeIntervalSince(actedAt) > Self.reArm {
+            actedSelection = []
+        }
         // 🔴 **问 Finder 这一发必须在主线程**。第一版为了不占主线程把它扔进了后台队列，
         //    结果是 `NSAppleScript` 一声不响地返回空 —— 药丸从不出现、日志一行都没有
         //    （2026-08-24 实测，白查了一轮）。它不是线程安全的，AE 的权限判定同理。
@@ -430,6 +451,7 @@ final class MainImagesPill {
             let fresh = FinderService.shared.selectionNow()
             let paths = fresh.isEmpty ? pending : fresh
             actedSelection = paths
+            actedAt = Date()
             lastSelection = paths
             hide()
             MainImages.openInPhotoshop(paths)
