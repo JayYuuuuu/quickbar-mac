@@ -1,5 +1,4 @@
 import AppKit
-import UserNotifications
 
 /// 网页上那个「在 Finder 打开」按钮的落点：`quickbar://reveal?path=…&dir=…&suffix=…`
 ///
@@ -38,6 +37,10 @@ enum URLScheme {
         switch action {
         case "reveal", "open":
             reveal(path: q("path"), dir: q("dir"), suffix: q("suffix"))
+        case "ps":
+            // 把这些目录里的主图丢进 Photoshop（`path` 可以出现多次）。挑图口径见 MainImages。
+            MainImages.openInPhotoshop(items.filter { $0.name == "path" }.compactMap(\.value).filter { !$0.isEmpty }
+                                            .compactMap { allowed($0)?.path })
         default:
             NSLog("[QuickBar] 不认识的 quickbar:// 动作：\(action)")
         }
@@ -60,25 +63,26 @@ enum URLScheme {
         if let d = fallback, isDir(d) {
             if !suffix.isEmpty, let hit = child(of: d, endingWith: suffix) { open(hit); return }
             open(d)
-            tell("没找到那个商品文件夹", "已经打开它所在的批次目录：\(d.lastPathComponent)")
+            Notify.tell("没找到那个商品文件夹", "已经打开它所在的批次目录：\(d.lastPathComponent)")
             return
         }
 
         // 连批次目录都没了：退到还存在的最近一层（多半是品牌目录或采集根目录）。
         if let any = target ?? fallback, let up = nearestExisting(any) {
             open(up)
-            tell("那个文件夹不在盘上了", "已经打开还找得到的上一层：\(up.path)")
+            Notify.tell("那个文件夹不在盘上了", "已经打开还找得到的上一层：\(up.path)")
             return
         }
 
-        tell("打不开这个文件夹", target == nil && fallback == nil
+        Notify.tell("打不开这个文件夹", target == nil && fallback == nil
              ? "这条链接给的路径不在素材盘（/Volumes）里，没有打开。"
              : "共享盘可能没挂上——先在访达里连一下 NAS 再点。")
     }
 
     // MARK: - 路径闸门
 
-    /// 只放行素材盘与用户家目录下的路径。`..` 先折平（`standardizedFileURL`）再判前缀，绕不过去。
+    /// 只放行素材盘与用户家目录下的路径。`reveal` 和 `ps` 共用这一道闸门。
+    ///`..` 先折平（`standardizedFileURL`）再判前缀，绕不过去。
     private static func allowed(_ raw: String) -> URL? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains("\0") else { return nil }
@@ -127,34 +131,6 @@ enum URLScheme {
             Actions.openFolder(url.path)          // 复用当前 Finder 窗口（窗口尺寸不会跳）
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([url])   // 是个文件就选中它
-        }
-    }
-
-    /// 把话说出去。通知没授权就退回弹框——这几条全是「你以为打开的是 A、其实是 B」，
-    /// 静悄悄地降级比不开还坏。
-    private static func tell(_ title: String, _ body: String) {
-        NSLog("[QuickBar] \(title)：\(body)")
-        guard Bundle.main.bundleIdentifier != nil else { return }
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            let granted = settings.authorizationStatus == .authorized
-                || settings.authorizationStatus == .provisional
-            DispatchQueue.main.async {
-                if granted {
-                    let content = UNMutableNotificationContent()
-                    content.title = title
-                    content.body = body
-                    let request = UNNotificationRequest(identifier: "reveal-\(Int(Date().timeIntervalSince1970))",
-                                                        content: content, trigger: nil)
-                    UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-                } else {
-                    let alert = NSAlert()
-                    alert.messageText = title
-                    alert.informativeText = body
-                    alert.alertStyle = .informational
-                    NSApp.activate(ignoringOtherApps: true)
-                    alert.runModal()
-                }
-            }
         }
     }
 }

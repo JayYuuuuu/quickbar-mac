@@ -15,6 +15,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onToggleTrigger: (() -> Void)?
     var onJumpToFinder: (() -> Void)?
     var onOpenNewestBatch: (() -> Void)?
+    var onMainImagesToPhotoshop: (() -> Void)?
+    var onOpenBatchLinksDir: (() -> Void)?
 
     override init() {
         super.init()
@@ -43,6 +45,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let open = item("打开 \(batch.name)", action: #selector(openNewestBatch))
             open.toolTip = batch.path
             menu.addItem(open)
+        }
+
+        // 下载完素材的下一步就是去水印：站在 Finder 里选中几个商品文件夹，一下全丢进 PS。
+        // 🔴 只在「能问到 Finder」且**真装了 Photoshop** 时才出这一项 —— 摆一个点了只会弹
+        //    「没找到 Photoshop」的菜单项，是把自己的实现细节摊给人看。
+        if Permissions.isGranted(.automation),
+           NSWorkspace.shared.urlForApplication(withBundleIdentifier: MainImages.photoshopBundleID) != nil {
+            let ps = item("主图丢进 PS", action: #selector(mainImagesToPhotoshop))
+            ps.toolTip = "把 Finder 里选中的商品文件夹（或整批）的「主图」全部在 Photoshop 里打开。没选就用当前窗口那个文件夹。"
+            menu.addItem(ps)
+        }
+
+        if Store.shared.settings.batchLinksEnabled, Store.shared.settings.materialFeedEnabled {
+            let links = item("最近素材批次…", action: #selector(openBatchLinksDir))
+            links.toolTip = "打开 ~/\(BatchLinks.dirName)/ —— 里面是最近几批的替身，把这个目录拖进 Finder 侧栏就常驻了。"
+            menu.addItem(links)
         }
 
         menu.addItem(.separator())
@@ -99,6 +117,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func openPermissions() { onOpenPermissions?() }
     @objc private func jumpToFinder() { onJumpToFinder?() }
     @objc private func openNewestBatch() { onOpenNewestBatch?() }
+    @objc private func mainImagesToPhotoshop() { onMainImagesToPhotoshop?() }
+    @objc private func openBatchLinksDir() { onOpenBatchLinksDir?() }
     @objc private func checkUpdates() { Updater.shared.check(userInitiated: true) }
     @objc private func quit() { NSApp.terminate(nil) }
 

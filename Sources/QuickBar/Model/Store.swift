@@ -135,6 +135,9 @@ struct Settings: Codable {
     /// 见 MaterialFeed.builtInKey。这里非空就优先用这里的。
     var materialFeedKey: String = ""
     var materialFeedNotify: Bool = true
+    /// 在家目录维护一个 `~/最近素材批次/`（里面是最近几批的替身，拖进 Finder 侧栏用）。
+    /// 见 Core/BatchLinks.swift。
+    var batchLinksEnabled: Bool = true
 
     /// 记住的文件面板尺寸（全局一份）。
     var panelWidth: Double = 0

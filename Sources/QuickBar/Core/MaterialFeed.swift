@@ -79,6 +79,9 @@ final class MaterialFeed {
             // 关掉之后必须把条目和缓存一起清干净，否则下次开机 loadCache() 会把
             // 一批过期目录又摆回快捷条上——用户已经明确说不要了。
             statusText = Store.shared.settings.materialFeedEnabled ? "还没填密码" : "未启用"
+            // 🔴 清链接目录要放在下面那个 early return **之前**：批次本来就空的时候也得清，
+            //    否则「关掉开关」这一下什么都不会发生，侧栏里那一排替身一直挂着。
+            BatchLinks.clear()
             guard !batches.isEmpty else { return }
             batches = []
             lastSyncAt = nil
@@ -220,6 +223,8 @@ final class MaterialFeed {
         saveCache()
         Availability.shared.refresh()
         NotificationCenter.default.post(name: .quickBarMaterialFeedChanged, object: nil)
+        // Finder 侧栏那个「最近素材批次」跟着这份清单走（整套 IO 在后台队列，见 BatchLinks 文件头）
+        BatchLinks.sync(batches)
     }
 
     /// 最新那一批，菜单栏直接给个入口。

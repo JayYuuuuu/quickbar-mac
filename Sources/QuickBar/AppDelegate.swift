@@ -30,6 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             guard let batch = MaterialFeed.shared.newest else { return }
             Actions.openFolder(batch.path)
         }
+        // 去水印那道工序的入口：Finder 里选中几个商品文件夹 → 主图全部在 PS 里打开（见 MainImages）
+        menuBar?.onMainImagesToPhotoshop = {
+            MainImages.openInPhotoshop(FinderService.shared.selectionNow())
+        }
+        menuBar?.onOpenBatchLinksDir = { BatchLinks.revealInFinder() }
 
         FinderService.shared.start()
         FinderWindowService.shared.start()

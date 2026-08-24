@@ -490,6 +490,13 @@ private struct MaterialPane: View {
                 ))
                 .disabled(!store.settings.materialFeedEnabled)
                 .help("点通知直接在 Finder 里打开那个批次目录。")
+
+                Toggle("在 Finder 侧栏里放一个「\(BatchLinks.dirName)」", isOn: Binding(
+                    get: { store.settings.batchLinksEnabled },
+                    set: { store.settings.batchLinksEnabled = $0; BatchLinks.sync([]); MaterialFeed.shared.start() }
+                ))
+                .disabled(!store.settings.materialFeedEnabled)
+                .help("在家目录建 ~/\(BatchLinks.dirName)/，里面是最近 12 批的替身，跟着服务器自动更新。把这个目录拖进 Finder 侧栏一次，以后点开就是最新那几批。里面只放替身，删掉不影响真素材。")
             } header: {
                 Text("素材批次")
             } footer: {
@@ -498,6 +505,8 @@ private struct MaterialPane: View {
                         MaterialFeed.shared.start()
                     }
                     .disabled(!store.settings.materialFeedEnabled)
+                    Button("打开那个目录") { BatchLinks.revealInFinder() }
+                        .disabled(!store.settings.materialFeedEnabled || !store.settings.batchLinksEnabled)
                     Text(age.isEmpty ? status : "\(status) · \(age)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
