@@ -31,16 +31,23 @@ enum Photoshop {
     private enum Format {
         case jpeg, png
 
-        /// 存回去那一句。`p` 是 `file path of d` 拿到的 alias —— **不拼路径字符串**：
-        /// 素材盘是 SMB，服务端读到的目录名和访达呈现的可能差一次 Unicode 归一化，
-        /// 拼出来的路径会指不到那个文件（这个坑在 URLScheme 里已经吃过一次）。
+        /// 存回去那一句。`dest` 由 `my toFile(file path of d)` 得来（见 `TO_FILE`）。
+        ///
+        /// 🔴 **目标必须是 file specification，不能是 alias。** `file path of d` 给的是 alias，
+        ///    直接 `save d in <alias>` 会报 **8800「发生了常规 Photoshop 错误」** —— 一句有用的话都没有。
+        ///    2026-08-24 在真 PS 上逐个参数试过：`POSIX file` 当目标，带不带 `embed color profile`、
+        ///    带不带 `appending` 全部成功；换成 alias 就必失败。`save` 的形参写着 file specification，
+        ///    PS 是真的只吃这一种。
+        /// 🔴 **路径不是我们拼的**：字符串从 PS 自己那儿来（`POSIX path of` 它给的 alias），
+        ///    转换全交给 AppleScript 自己的强制转换，原样递回去。素材盘是 SMB，
+        ///    自己拼路径会撞上 Unicode 归一化（URLScheme 那节吃过一次）。
         var saveLine: String {
             switch self {
             case .jpeg:
-                return "save d in p as JPEG with options {class:JPEG save options, quality:12, "
+                return "save d in dest as JPEG with options {class:JPEG save options, quality:12, "
                      + "embed color profile:true} appending no extension without copying"
             case .png:
-                return "save d in p as PNG with options {class:PNG save options, interlaced:false} "
+                return "save d in dest as PNG with options {class:PNG save options, interlaced:false} "
                      + "appending no extension without copying"
             }
         }
@@ -248,6 +255,19 @@ enum Photoshop {
 
     // MARK: - 脚本
 
+    /// 把 PS 给的 alias 变成它自己肯收的 file specification。
+    ///
+    /// 🔴 **必须写成处理器**，不能在 `tell` 块里直接 `POSIX file (POSIX path of a)`：
+    ///    `POSIX path` 在 PS 的 `tell` 块里会被它的 Path Suite 抢走（见 `infoScript`），
+    ///    而处理器体是在**脚本自己的上下文**里求值的，`my toFile(...)` 就绕开了这个抢词。
+    ///    （顺带：`POSIX file` 也不能在 `tell` 块里直接写，PS 会把它当成自己的对象去解，
+    ///    报 -1728「不能获得 …of «script»」。放进处理器一起解决。）
+    private static let TO_FILE = """
+    on toFile(a)
+        return POSIX file (POSIX path of a)
+    end toFile
+    """
+
     /// 只读探测：打开了几个文档、最前那个叫什么、有没有原始路径、路径是什么、失败的话为什么。
     /// 每次动作的第一发都是它（见文件头第二条）。
     ///
@@ -294,10 +314,11 @@ enum Photoshop {
     /// `flatten` 对本来就只有一个背景图层的文档会报「当前不可用」，所以单独 try 起来。
     private static func saveFrontScript(_ format: Format) -> String {
         """
+        \(TO_FILE)
         tell application id "\(bundleID)"
             try
                 set d to current document
-                set p to file path of d
+                set dest to my toFile(file path of d)
                 try
                     flatten d
                 end try
@@ -315,6 +336,7 @@ enum Photoshop {
     ///    正着走会漏掉一半。跳过的那些（不是 jpg/png）留在 PS 里不关，所以也不能写成
     ///    `repeat while (count of documents) > 0` —— 那是个死循环。
     private static let saveAllScript = """
+    \(TO_FILE)
     tell application id "\(bundleID)"
         set doneN to 0
         set skipN to 0
@@ -324,7 +346,7 @@ enum Photoshop {
             try
                 set d to document i
                 set nm to name of d
-                set p to file path of d
+                set dest to my toFile(file path of d)
                 if nm ends with ".png" or nm ends with ".PNG" then
                     try
                         flatten d

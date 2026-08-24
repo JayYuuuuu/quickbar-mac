@@ -146,6 +146,15 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   超时兜底除了说话，还必须 `thread = nil` 换一条新的 —— 不然一次卡死之后这功能到重启为止都是哑的。
 - 🔴 **存回去用 `file path of d` 拿到的 alias，不拼路径字符串**。素材盘是 SMB，
   服务端读到的目录名和访达呈现的可能差一次 Unicode 归一化（URLScheme 那节已经吃过一次）。
+- 🔴 **`save … in` 的目标必须是 file specification，不能是 alias。**
+  `file path of d` 给的就是 alias，直接喂回去必报 **8800「发生了常规 Photoshop 错误。
+  该功能可能无法在这个版本的 Photoshop 中使用」** —— 一句有用的话都没有，1.12.0/1.12.1 卡在这儿。
+  2026-08-24 在真 PS 上逐参数试过：目标写 `POSIX file` 时，带不带 `embed color profile`、
+  带不带 `appending no extension` 全部成功；只要换成 alias 就必失败。
+  转换写成**处理器** `on toFile(a) return POSIX file (POSIX path of a) end toFile`，
+  在 `tell` 块里 `my toFile(file path of d)` 调用 —— 处理器体在脚本自己的上下文求值，
+  一举绕开下面那条抢词。（`POSIX file` 直接写在 `tell` 块里也不行，PS 会当成自己的对象去解，
+  报 -1728「不能获得 …of «script»」。）
 - 🔴 **`POSIX path of` 绝不能写在 `tell application id "com.adobe.Photoshop"` 块里面。**
   PS 的字典里有一整套 **Path Suite**（`path item` / `path name` / `entire path` / `target path`…，
   贝塞尔路径那套），`path` 这个词被它抢走，`POSIX path of x` 于是被送给 PS 而不是交给
@@ -169,8 +178,13 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   `log show --predicate 'process == "QuickBar"'` 是能跑的（早先记的「拿不到」不准确），
   但 NSLog 的**正文是 `<private>`**，只看得到一行占位符 —— 能看出「点击到了 / 脚本跑了 /
   发了通知」这类骨架，看不到任何内容。`Notify.log` 现在同时落一份明文到那个文件。
+- **要在真 PS 上试脚本**：`ssh mac24g` 跑 `osascript` 需要「sshd 想要控制 Photoshop」授权
+  （2026-08-24 已批）。安全做法：`cp` 一张图到 `/tmp` → `open -b com.adobe.Photoshop` 打开它 →
+  **先 `name of current document` 确认最前面的是那个临时文件再动手**，否则会覆盖人正在改的真素材。
+  只读的探测直接跑；要试 `save` 就加 `with copying` 存到 `/tmp`。
 - 改 AppleScript 之后**先在 Mac 上 `osacompile` 过一遍**再信它 —— 但注意
-  **`osacompile` 只管语法，管不了术语被抢**（上面那条 `POSIX path` 编译一路绿灯，运行才炸）：
+  **`osacompile` 只管语法，管不了术语被抢、也管不了参数类型**
+  （`POSIX path` 抢词和 alias 当目标这两条，编译全程绿灯，运行才炸）：
   `python3` 把 `Photoshop.swift` 里的字面量抠出来、替掉插值，`scp` 上去 `osacompile -o /tmp/x.scpt`。
   PS 的术语只有它自己的 sdef 说了算，Swift 编译器一个字都帮不上。
 
