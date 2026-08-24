@@ -96,6 +96,23 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   Mac `/Volumes/<共享>`，只差一个前缀），不是拼的。改那边先读 AI 电商内容助手仓库的
   `docs/rules/采集-店铺与详情浏览.md` 与 `api/material-folder.js` 的文件头。
 
+## 主图丢进 PS / `~/最近素材批次`（v1.9.0）
+
+- `MainImages.swift` 是**挑图口径的唯一一处**：单张图 / `主图` 目录 / 商品文件夹 / 批次目录都认。
+  🔴 **只往下看一层，不递归** —— 给的要是品牌目录，递归下去就是几千张图，人只会看到 PS 卡死，
+  根本猜不到自己点了什么。🔴 `SUB_DIRS` 现在只有 `主图`：`主图1比1` 是另一套回填图，
+  加进去是个**决定**（每件多开一堆标签页），别当成顺手。
+- `FinderService.selectionNow()` 是**现查**的，跟缓存那份 `currentSelection` 不是一回事
+  （后者只记单个文件、还是 Finder 激活/失活时刷的）。「把选中的这几个丢进 PS」差一步就开错东西。
+- `BatchLinks.swift`：🔴 **只删自己建的符号链接**（按 `attributesOfItem` 判 typeSymbolicLink，
+  不跟随链接）。这目录在人家家目录下，普通文件/文件夹一律不碰。
+  🔴 **整套 IO 在后台队列**：目标在 `/Volumes`（SMB）上，盘掉了一个 `stat` 能卡好几秒，
+  而这活儿由网络回调触发 —— 放主线程上就是整个软件转圈。
+  🔴 关开关时清目录要放在 MaterialFeed 那个 `guard !batches.isEmpty` **之前**，
+  否则批次本来就空时「关掉」这一下什么都不会发生。
+- 用户面前那台机器是 **mac24g**（浏览器、Finder、PS 都在这台）。另一台 `macmini-i7` 跑采集/runner，
+  **有意不装 QuickBar**（用户 2026-08-24 明确说不用），别把「要在人面前发生」的动作推给它。
+
 ## 其它
 
 - **本地开发版会被自动更新器换掉**：`./build.sh` 出的是 `0.0.0-dev`，已加护栏（版本含 `dev` 不参与
