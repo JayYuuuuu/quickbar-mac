@@ -127,6 +127,14 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   🔴 这台机器上 **`log show` 拿不到 NSLog**（远程排查时别指望它），验证靠临时写 `/tmp` 文件 +
      `CGWindowListCopyWindowInfo` 看窗口在不在屏幕上（`layer=3` 就是 floating）。
      屏幕截不到（`screencapture` 在 ssh 会话里报 could not create image from display）。
+- `WindowFollow.swift`（v1.14.0）让药丸贴着宿主窗口走。
+  🔴 **移动/缩放通知是注册在那个窗口元素上的，不是应用上** —— 人 ⌘N 开个新窗口，
+  旧注册还挂在旧窗口上，表现是「有时候跟、有时候不跟」。所以应用元素上还得盯
+  `focusedWindowChanged`，一变就把窗口那几条重新挂过去。
+  🔴 **`AXObserverGetRunLoopSource` 要挂主线程的 run loop**：回调里动 NSPanel，AppKit 只认主线程。
+  🔴 **推送会漏**（切空间、换显示器、窗口被别的程序移动），所以心跳那一跳在药丸可见时
+  照样补一次位 —— **推送负责跟手，心跳负责别跑偏**，两个都得有。
+  🔴 **位置没变就别 `setFrameOrigin`**：拖窗时通知一秒好几十条，每条都重设一次浮窗自己会抖。
 - 用户面前那台机器是 **mac24g**（浏览器、Finder、PS 都在这台）。另一台 `macmini-i7` 跑采集/runner，
   **有意不装 QuickBar**（用户 2026-08-24 明确说不用），别把「要在人面前发生」的动作推给它。
 

@@ -51,6 +51,8 @@ final class MainImagesPill {
     private var mode: Mode = .finder
     /// 药丸上现在写着什么。用来判「要不要重画」（见 `show`）。
     private var shownTitle = ""
+    /// 贴着谁走。窗口一动就把药丸挪过去（见 Core/WindowFollow.swift）。
+    private let follow = WindowFollow()
 
     private init() {}
 
@@ -72,6 +74,8 @@ final class MainImagesPill {
                 self?.leave()
             }
         }
+        // 宿主窗口一动/一缩/一换，药丸立刻跟过去 —— 等 1.5 秒的心跳会看到它"掉队"。
+        follow.onChange = { [weak self] in self?.reposition() }
         // 存回一张之后数字要立刻变（甚至归零收掉），等下一次心跳会让人以为没生效。
         Photoshop.onStateChanged = { [weak self] in
             guard let self, self.mode == .photoshop else { return }
@@ -125,10 +129,18 @@ final class MainImagesPill {
         hide()
     }
 
+    /// 当前该贴着谁。
+    private var hostBundleID: String {
+        mode == .finder ? "com.apple.finder" : Photoshop.bundleID
+    }
+
     // MARK: - 轮询
 
     private func tick() {
         guard enabled else { stopHeartbeat(); return }
+        // 心跳只负责「别跑偏」：跟手是 WindowFollow 的推送在做，这里兜住漏掉的那些
+        // （切空间、换显示器、窗口被别的程序移动）。可见时才算，两次 AX 读取。
+        if panel?.isVisible == true { reposition() }
         switch NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
         case "com.apple.finder":
             // 从别处回到 Finder：**忘掉上一次的选中项**，否则「选中项没变」那一条
@@ -197,6 +209,9 @@ final class MainImagesPill {
     // MARK: - 那颗药丸
 
     private func show(title: String, tip: String) {
+        // 贴谁走。幂等，换了宿主（访达 ↔ PS）也是在这儿切过去的 —— 放在下面那条
+        // 提前返回**之前**：文案没变但宿主换了的时候，返回了就还贴在上一个窗口上。
+        follow.follow(hostBundleID)
         // 🔴 PS 那头是**每一跳都会调到这儿**的（数字来自本地记账，不问 PS）。
         //    文字没变、药丸还在屏幕上，就一个字都别动 —— 否则每 1.5 秒重摆一次窗口、刷一行日志。
         if title == shownTitle, panel?.isVisible == true { return }
@@ -220,6 +235,8 @@ final class MainImagesPill {
 
     private func hide() {
         panel?.orderOut(nil)
+        // 药丸不在屏幕上就没人需要知道窗口动了 —— 注册着的通知全撤掉，回到零负载。
+        follow.stop()
     }
 
     private func fittingWidth(for title: String) -> CGFloat {
@@ -284,18 +301,24 @@ final class MainImagesPill {
 
     // MARK: - 摆哪儿
 
+    /// 窗口动了就把药丸挪过去。药丸不在屏幕上时什么都不做。
+    private func reposition() {
+        guard let panel, panel.isVisible else { return }
+        place(panel)
+    }
+
     /// 贴在最前那个窗口的下缘内侧；拿不到窗口就贴当前屏幕右下。
     ///
     /// Finder 贴**右下角**（列表右边通常是空的）；PS 贴**下缘中间** ——
     /// 右下角是图层面板，左下角是缩放比例和文档大小，中间那条状态栏才是空的。
     ///
-    /// 🔴 AX 给的坐标是「主屏左上角为原点、y 向下」，AppKit 是「左下为原点、y 向上」，必须翻一次。
-    ///    翻错了的表现是药丸跑到屏幕外（看着像"没弹出来"），所以最后一定要夹回可见区域。
+    /// 坐标换算在 `WindowFollow` 里做（AX 是主屏左上角原点、y 向下）；这儿只管贴哪个角，
+    /// 最后一定要夹回可见区域 —— 窗口被拖到屏幕边上时，药丸会算到屏幕外面去。
     private func place(_ panel: NSPanel) {
         let size = panel.frame.size
         var origin: NSPoint
-        let host = mode == .finder ? "com.apple.finder" : Photoshop.bundleID
-        if let rect = frontWindowFrameInAppKit(of: host) {
+        // 正在跟的那个窗口优先（通知回调里它已经是最新的），还没开始跟就现查一次
+        if let rect = follow.frame ?? WindowFollow.frontWindowFrame(of: hostBundleID) {
             origin = mode == .finder
                 ? NSPoint(x: rect.maxX - size.width - 18, y: rect.minY + 18)
                 : NSPoint(x: rect.midX - size.width / 2, y: rect.minY + 34)
@@ -311,21 +334,9 @@ final class MainImagesPill {
             origin.x = min(max(origin.x, vf.minX + 8), vf.maxX - size.width - 8)
             origin.y = min(max(origin.y, vf.minY + 8), vf.maxY - size.height - 8)
         }
+        // 没挪窝就别叫 setFrameOrigin：拖窗时通知一秒好几十条，每条都重设一次
+        // 会让这颗浮窗自己抖起来。
+        guard origin != panel.frame.origin else { return }
         panel.setFrameOrigin(origin)
-    }
-
-    private func frontWindowFrameInAppKit(of bundleID: String) -> CGRect? {
-        guard Permissions.isGranted(.accessibility),
-              let host = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
-        else { return nil }
-        let app = AXUIElementCreateApplication(host.processIdentifier)
-        guard let win = AX.element(app, AXAttr.focusedWindow) ?? AX.elements(app, AXAttr.windows).first,
-              let pos = AX.position(win), let sz = AX.size(win), sz.width > 120, sz.height > 80
-        else { return nil }
-        // 主屏（原点在 (0,0) 那块）的高度是两套坐标之间的换算基准
-        guard let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.main
-        else { return nil }
-        let y = primary.frame.maxY - (pos.y + sz.height)
-        return CGRect(x: pos.x, y: y, width: sz.width, height: sz.height)
     }
 }
