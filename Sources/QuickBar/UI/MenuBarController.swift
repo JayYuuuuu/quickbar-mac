@@ -29,6 +29,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshIcon()
         menu.removeAllItems()
 
         menu.addItem(item("唤出快捷条", action: #selector(showQuickBar)))
@@ -119,11 +120,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return menuItem
     }
 
+    /// 「还差 N 项授权」左边那颗点。设计稿 1e：**用 `NSMenuItem.image` 塞一颗 7pt 圆点，
+    /// 不用 emoji** —— emoji 在不同系统版本上大小和基线都会飘。
     private func dot(color: NSColor) -> NSImage {
-        let size = NSSize(width: 8, height: 8)
+        let size = NSSize(width: 7, height: 7)
         let image = NSImage(size: size, flipped: false) { rect in
             color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
             return true
         }
         return image
@@ -142,30 +145,45 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func checkUpdates() { Updater.shared.check(userInitiated: true) }
     @objc private func quit() { NSApp.terminate(nil) }
 
-    /// 菜单栏图标：三条横杠加一个右尖角，模板图会自动跟随深浅色和高亮态。
+    /// 菜单栏图标：三条等长的横杠 + 一个右尖角 —— 「三个常去的地方」＋「往那边去」。
+    ///
+    /// 设计稿 1e 的形，16×16、描边 1.5、圆头。**必须是模板图**（`isTemplate`）：
+    /// 系统会按明暗和高亮态自动反色，自己上色的话深色菜单栏里会看不见。
+    /// 旧版画的是三条**不等长**的实心圆角条，在 16pt 上糊成一团，这版改成等长描边。
     static func icon() -> NSImage {
-        let size = NSSize(width: 17, height: 15)
+        let size = NSSize(width: 16, height: 16)
         let image = NSImage(size: size, flipped: false) { _ in
-            NSColor.black.setFill()
-            let bars: [(CGFloat, CGFloat)] = [(11, 7.5), (6.6, 9.5), (2.2, 5.5)]
-            for (y, width) in bars {
-                NSBezierPath(roundedRect: NSRect(x: 1.5, y: y, width: width, height: 1.9),
-                             xRadius: 0.95, yRadius: 0.95).fill()
+            NSColor.black.setStroke()
+            let bars = NSBezierPath()
+            for y in [4.5, 8.0, 11.5] {
+                bars.move(to: NSPoint(x: 2.5, y: y))
+                bars.line(to: NSPoint(x: 9.5, y: y))
             }
             let chevron = NSBezierPath()
-            chevron.move(to: NSPoint(x: 11.2, y: 6.4))
-            chevron.line(to: NSPoint(x: 14.2, y: 3.9))
-            chevron.line(to: NSPoint(x: 11.2, y: 1.4))
-            chevron.lineWidth = 1.7
-            chevron.lineCapStyle = .round
-            chevron.lineJoinStyle = .round
-            NSColor.black.setStroke()
-            chevron.stroke()
+            chevron.move(to: NSPoint(x: 12, y: 5.5))
+            chevron.line(to: NSPoint(x: 14, y: 8))
+            chevron.line(to: NSPoint(x: 12, y: 10.5))
+            for path in [bars, chevron] {
+                path.lineWidth = 1.5
+                path.lineCapStyle = .round
+                path.lineJoinStyle = .round
+                path.stroke()
+            }
             return true
         }
         image.isTemplate = true
         return image
     }
+
+    /// 暂停触发时把图标压到 45% 透明。
+    /// 🔴 **不换图形**：两个形状要认，而「暂停」是个临时状态，
+    ///    让人多记一个符号不值当（设计稿 1e 的原话）。
+    func refreshIcon() {
+        statusItem.button?.alphaValue = EventTapService.shared.isRunning ? 1 : 0.45
+        statusItem.button?.toolTip = EventTapService.shared.isRunning
+            ? "QuickBar" : "QuickBar · 已暂停触发"
+    }
+
 }
 
 private extension NSStatusItem {

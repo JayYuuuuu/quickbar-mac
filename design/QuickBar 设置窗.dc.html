@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+:root{
+--glass:rgba(249,249,251,.78);--glass-brd:rgba(0,0,0,.10);--glass-top:rgba(255,255,255,.7);
+--win:#f5f5f7;--win-brd:rgba(0,0,0,.13);--side:rgba(237,237,241,.72);--bar:rgba(246,246,248,.88);
+--fg:#17171a;--fg2:#77777f;--fg3:#a9a9b1;--sep:rgba(0,0,0,.08);--hover:rgba(0,0,0,.05);
+--accent:#0a6cff;--accent-soft:rgba(10,108,255,.13);--on-accent:#fff;
+--field:rgba(255,255,255,.92);--field-brd:rgba(0,0,0,.14);
+--ok:#28a54c;--ok-soft:rgba(40,165,76,.14);--warn:#e08c1a;--warn-soft:rgba(224,140,26,.16);
+--shadow:0 24px 56px rgba(18,20,26,.28),0 2px 6px rgba(18,20,26,.14);
+--desk:#b6b6c2;--page:#e8e8ed;--card:#ffffff;
+--note:#fdf3d8;--note-brd:rgba(150,115,25,.32);--note-fg:#5b4712;
+}
+:root[data-qb="dark"]{
+--glass:rgba(45,45,50,.80);--glass-brd:rgba(255,255,255,.13);--glass-top:rgba(255,255,255,.12);
+--win:#1f1f23;--win-brd:rgba(255,255,255,.11);--side:rgba(37,37,42,.74);--bar:rgba(40,40,45,.88);
+--fg:#f2f2f5;--fg2:#9b9ba3;--fg3:#6d6d76;--sep:rgba(255,255,255,.085);--hover:rgba(255,255,255,.07);
+--accent:#3b82ff;--accent-soft:rgba(59,130,255,.20);--on-accent:#fff;
+--field:rgba(255,255,255,.07);--field-brd:rgba(255,255,255,.14);
+--ok:#35c25f;--ok-soft:rgba(53,194,95,.18);--warn:#f0a63c;--warn-soft:rgba(240,166,60,.18);
+--shadow:0 28px 64px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.45);
+--desk:#3a3a42;--page:#17171a;--card:#2a2a30;
+--note:#3a3323;--note-brd:rgba(240,166,60,.35);--note-fg:#e8d5a4;
+}
+body{margin:0;background:var(--page);}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--fg)}
+</style>
+</helmet>
+
+<section style="box-sizing:border-box;width:100%;padding:44px 48px 80px;background:var(--page);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Hiragino Sans GB',sans-serif;text-wrap:pretty">
+
+  <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin:0 0 40px">
+    <div style="flex:1;min-width:320px">
+      <div style="font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;color:var(--fg3);margin-bottom:10px">QUICKBAR 1.13.1 · 画布 2 / 2</div>
+      <h1 style="margin:0;font:600 34px/1.15 -apple-system,'SF Pro Display','PingFang SC',sans-serif;letter-spacing:-.01em">设置窗 · 五页</h1>
+      <div style="margin-top:8px;color:var(--fg2);font-size:14px">SwiftUI Form（grouped）＋ 固定宽度自绘侧栏 172pt。窗体 760×540，不可缩到更小。</div>
+    </div>
+    <div style="display:flex;gap:6px;padding:4px;border-radius:9px;background:var(--hover);border:1px solid var(--sep)">
+      <button type="button" onClick="{{ setLight }}" style="{{ lightBtn }}">浅色</button>
+      <button type="button" onClick="{{ setDark }}" style="{{ darkBtn }}">深色</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:52px 44px;align-items:flex-start">
+
+    <!-- ══ 2a 条目 ══ -->
+    <div id="2a" data-screen-label="2a Settings 条目" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">2a</span>
+        <span style="font:600 16px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">Settings — 条目</span>
+        <span style="font-size:12px;color:var(--fg3)">四种行状态同屏</span>
+      </div>
+      <div style="width:760px;border-radius:11px;overflow:hidden;background:var(--win);border:1px solid var(--win-brd);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--sep)">
+          <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+          <span style="flex:1;text-align:center;font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);margin-right:60px">QuickBar 设置</span>
+        </div>
+        <div style="display:flex;height:470px">
+          <div style="width:172px;flex:none;background:var(--side);border-right:1px solid var(--sep);padding:10px 8px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;background:var(--accent);color:var(--on-accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg><span style="font-weight:600">条目</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.2 5.3 8 2.4l5.8 2.9v5.4L8 13.6l-5.8-2.9z"/><path d="M2.2 5.3 8 8.2l5.8-2.9M8 8.2v5.4"/></svg><span>素材批次</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M4 2.6 4 10l1.8-1.6 1.1 2.9 1.5-.6-1.1-2.9H9.7z"/><path d="M11 4.2l1.8-1M11.8 7.2h2M11 10.2l1.8 1"/></svg><span>触发</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M8 1.9 13.2 3.4v4.3c0 3.2-2.3 5.4-5.2 6.4-2.9-1-5.2-3.2-5.2-6.4V3.4z"/><rect x="6.2" y="6.6" width="3.6" height="3.4" rx=".8"/><path d="M6.9 6.6V5.7a1.1 1.1 0 0 1 2.2 0v.9"/></svg><span>权限</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6"/></svg><span>通用</span></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--win)">
+            <div style="flex:1;padding:18px 20px;overflow:hidden">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px">
+                <span style="font:600 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">快捷条里的条目 · 9</span>
+                <span title="拖动行首把手可排序，顺序即快捷条里的顺序" style="font-size:11.5px;color:var(--fg3)">拖动排序</span>
+              </div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px">
+                  <span style="color:var(--fg3);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="display:flex;color:var(--accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">素材库</span>
+                  <span style="font:11px/1 ui-monospace,Menlo,monospace;color:var(--fg3)">~/素材库</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:11px"></div>
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px;background:var(--hover)">
+                  <span style="color:var(--fg2);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="display:flex;color:var(--accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">2026Q3 上新</span>
+                  <button type="button" style="font:12px/1 -apple-system,'PingFang SC',sans-serif;padding:4px 8px;border-radius:5px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">重命名…</button>
+                  <button type="button" style="font:12px/1 -apple-system,'PingFang SC',sans-serif;padding:4px 8px;border-radius:5px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">在 Finder 中显示</button>
+                  <button type="button" title="移除条目" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg2);cursor:pointer"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:11px"></div>
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px">
+                  <span style="color:var(--fg3);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="display:flex;color:var(--accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg></span>
+                  <span style="flex:1;min-width:0;display:flex;align-items:center">
+                    <span style="width:100%;max-width:250px;height:24px;border-radius:5px;background:var(--field);border:1.5px solid var(--accent);box-shadow:0 0 0 3px var(--accent-soft);display:flex;align-items:center;padding:0 7px;font-size:12.5px">主图待修<span style="width:1px;height:14px;background:var(--accent);margin-left:1px"></span></span>
+                  </span>
+                  <span style="font:11px/1 ui-monospace,Menlo,monospace;color:var(--fg3)">↩ 确认 · ⎋ 取消</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:11px"></div>
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px">
+                  <span style="color:var(--fg3);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="width:15px;height:15px;border-radius:4px;background:linear-gradient(180deg,#2b7fd4,#0a4f96);color:#fff;font:700 8px/15px ui-monospace,Menlo,monospace;text-align:center">Ps</span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Adobe Photoshop 2026</span>
+                  <span title="这个应用现在正在运行" style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 5px;border-radius:5px;background:var(--ok-soft);color:var(--ok)"><span style="width:5px;height:5px;border-radius:50%;background:var(--ok)"></span>运行中</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:11px"></div>
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px">
+                  <span style="color:var(--fg3);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="width:15px;height:15px;border-radius:4px;background:#2b2b30;color:#8ef08e;font:700 8px/15px ui-monospace,Menlo,monospace;text-align:center">&gt;_</span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">终端</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:11px"></div>
+
+                <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 11px;opacity:.62">
+                  <span style="color:var(--fg3);display:flex"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></svg></span>
+                  <span style="display:flex;color:var(--fg3)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-dasharray="2.4 1.8"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through;text-decoration-color:var(--fg3)">外置盘 / 2025 归档</span>
+                  <span title="卷未挂载。条目保留不删——插回去就恢复" style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 5px;border-radius:5px;background:var(--warn-soft);color:var(--warn)"><span style="width:5px;height:5px;border-radius:50%;background:var(--warn)"></span>找不到</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="padding:12px 20px;border-top:1px solid var(--sep);background:var(--bar);display:flex;align-items:center;gap:9px">
+              <button type="button" style="font:12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 12px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">添加文件夹…</button>
+              <button type="button" style="font:12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 12px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">添加应用…</button>
+              <span style="flex:1;text-align:right;font-size:11.5px;color:var(--fg3)">也可以把文件夹或应用直接拖进来</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="max-width:760px;padding:12px 14px;border-radius:10px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.55">
+        <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:6px">实现侧 · 便签</div>
+        <b>侧栏固定宽度自绘 172pt，不用 NavigationSplitView</b>：它的侧栏能被拖到折叠，而恢复要靠「显示」菜单——后台程序没有菜单栏，折叠了就再也回不来。<br>
+        <b>找不到的条目只标记不删除</b>：常用文件夹在外置盘上，拔盘时自动删条目等于毁配置，插回去也回不来。探测全在后台线程做——没挂载的卷上 <code>stat</code> 会卡好几秒，主线程碰不得。行内动作只在悬停时出现，常态行只有名称＋路径。
+      </div>
+    </div>
+
+    <!-- ══ 2b 素材批次 ══ -->
+    <div id="2b" data-screen-label="2b Material" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">2b</span>
+        <span style="font:600 16px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">Material — 素材批次</span>
+        <span style="font-size:12px;color:var(--fg3)">全新页</span>
+      </div>
+      <div style="width:760px;border-radius:11px;overflow:hidden;background:var(--win);border:1px solid var(--win-brd);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--sep)">
+          <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+          <span style="flex:1;text-align:center;font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);margin-right:60px">QuickBar 设置</span>
+        </div>
+        <div style="display:flex;height:470px">
+          <div style="width:172px;flex:none;background:var(--side);border-right:1px solid var(--sep);padding:10px 8px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg><span>条目</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;background:var(--accent);color:var(--on-accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.2 5.3 8 2.4l5.8 2.9v5.4L8 13.6l-5.8-2.9z"/><path d="M2.2 5.3 8 8.2l5.8-2.9M8 8.2v5.4"/></svg><span style="font-weight:600">素材批次</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M4 2.6 4 10l1.8-1.6 1.1 2.9 1.5-.6-1.1-2.9H9.7z"/><path d="M11 4.2l1.8-1M11.8 7.2h2M11 10.2l1.8 1"/></svg><span>触发</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M8 1.9 13.2 3.4v4.3c0 3.2-2.3 5.4-5.2 6.4-2.9-1-5.2-3.2-5.2-6.4V3.4z"/><rect x="6.2" y="6.6" width="3.6" height="3.4" rx=".8"/><path d="M6.9 6.6V5.7a1.1 1.1 0 0 1 2.2 0v.9"/></svg><span>权限</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6"/></svg><span>通用</span></div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="flex:1;padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow:hidden">
+
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1">把最近的素材下载批次放进快捷条</span>
+                  <span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1">密码</span>
+                  <span style="width:200px;height:24px;border-radius:6px;background:var(--field);border:1px solid var(--field-brd);display:flex;align-items:center;padding:0 8px;letter-spacing:.18em;color:var(--fg2);font-size:12px">••••••••••</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1">下完了通知我</span>
+                  <span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1">在 Finder 侧栏里放一个「最近素材批次」</span>
+                  <span style="width:38px;height:22px;border-radius:11px;background:var(--hover);border:1px solid var(--field-brd);position:relative;flex:none"><span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span>
+                </div>
+              </div>
+
+              <div>
+                <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">去水印工序</div>
+                <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                    <span style="flex:1">在 Finder 里选中商品文件夹时浮出「主图丢进 PS」</span>
+                    <span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span>
+                  </div>
+                  <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                  <div style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-left:0">
+                    <span style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <span>在 PS 里按 <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:2px 5px;border-radius:4px;background:var(--hover);border:1px solid var(--sep)">⌃⌘S</span> 把改完的这张覆盖存回原位</span>
+                      <span title="存回会用改完的这一版替掉原图，没有撤销、没有副本。走 SMB 网络盘，中途断网会留下半张——建议先在批次目录外留一份底图。" style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 6px;border-radius:5px;background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);white-space:nowrap"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v6.2M8 12.2h.01"/></svg>会覆盖原图</span>
+                    </span>
+                    <span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px;padding:0 4px">
+                <button type="button" style="font:12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 12px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">立即同步</button>
+                <button type="button" style="font:12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 12px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">打开那个目录</button>
+                <span style="flex:1;text-align:right;font-size:11.5px;color:var(--fg3)">上次同步 16:50 · 23 个批次</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="max-width:760px;padding:12px 14px;border-radius:10px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.55">
+        <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:6px">实现侧 · 便签</div>
+        「密码」一栏<b>只在发布包没内置口令时渲染</b>（内置时整行不出现，不要置灰）。<br>
+        「会覆盖原图」是全软件唯一的资损级提示：一行、橙色、带边框，原因全进 tip。<b>不要再加第二处文字说明</b>。<br>
+        快捷条那行的上传状态：<b>没派过上传任务的批次一个字都不加</b>，不写「未上传」。
+      </div>
+    </div>
+
+    <!-- ══ 2c 触发 ══ -->
+    <div id="2c" data-screen-label="2c Trigger" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">2c</span>
+        <span style="font:600 16px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">Trigger — 触发</span>
+      </div>
+      <div style="width:760px;border-radius:11px;overflow:hidden;background:var(--win);border:1px solid var(--win-brd);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--sep)">
+          <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+          <span style="flex:1;text-align:center;font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);margin-right:60px">QuickBar 设置</span>
+        </div>
+        <div style="display:flex;height:470px">
+          <div style="width:172px;flex:none;background:var(--side);border-right:1px solid var(--sep);padding:10px 8px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg><span>条目</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.2 5.3 8 2.4l5.8 2.9v5.4L8 13.6l-5.8-2.9z"/><path d="M2.2 5.3 8 8.2l5.8-2.9M8 8.2v5.4"/></svg><span>素材批次</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;background:var(--accent);color:var(--on-accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2.6 4 10l1.8-1.6 1.1 2.9 1.5-.6-1.1-2.9H9.7z"/><path d="M11 4.2l1.8-1M11.8 7.2h2M11 10.2l1.8 1"/></svg><span style="font-weight:600">触发</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M8 1.9 13.2 3.4v4.3c0 3.2-2.3 5.4-5.2 6.4-2.9-1-5.2-3.2-5.2-6.4V3.4z"/><rect x="6.2" y="6.6" width="3.6" height="3.4" rx=".8"/><path d="M6.9 6.6V5.7a1.1 1.1 0 0 1 2.2 0v.9"/></svg><span>权限</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6"/></svg><span>通用</span></div>
+          </div>
+
+          <div style="flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">唤出方式</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="width:15px;height:15px;border-radius:50%;border:4.5px solid var(--accent);background:var(--card);box-shadow:inset 0 0 0 1px var(--accent);flex:none"></span>
+                  <span style="flex:1">连按两下 <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:2px 5px;border-radius:4px;background:var(--hover);border:1px solid var(--sep)">⌘</span></span>
+                  <span style="font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">默认</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="width:15px;height:15px;border-radius:50%;border:1px solid var(--field-brd);background:var(--field);flex:none"></span>
+                  <span style="flex:1">修饰键 + 双击任意位置</span>
+                  <span style="display:flex;padding:2px;border-radius:6px;background:var(--hover);border:1px solid var(--sep);gap:2px">
+                    <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:4px 8px;border-radius:4px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.15)">⌥</span>
+                    <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:4px 8px;border-radius:4px;color:var(--fg2)">⌃</span>
+                    <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:4px 8px;border-radius:4px;color:var(--fg2)">⇧</span>
+                    <span style="font:12px/1 ui-monospace,Menlo,monospace;padding:4px 8px;border-radius:4px;color:var(--fg2)">⌘</span>
+                  </span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="width:15px;height:15px;border-radius:50%;border:1px solid var(--field-brd);background:var(--field);flex:none"></span>
+                  <span style="flex:1">双击桌面空白处</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="width:15px;height:15px;border-radius:50%;border:1px solid var(--field-brd);background:var(--field);flex:none"></span>
+                  <span style="flex:1">裸双击</span>
+                  <span title="任何双击都会唤出——在列表、画布、表格里都可能误触" style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 6px;border-radius:5px;background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn)"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v6.2M8 12.2h.01"/></svg>易误触发</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">快捷键</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="flex:1;color:var(--fg2)">跳到 Finder 当前文件夹</span>
+                  <span style="font:13px/1 ui-monospace,Menlo,monospace;padding:4px 9px;border-radius:5px;background:var(--hover);border:1px solid var(--sep);color:var(--fg)">⌘G</span>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+                  <span style="flex:1;color:var(--fg2)">在 PS 里存回原位</span>
+                  <span style="font:13px/1 ui-monospace,Menlo,monospace;padding:4px 9px;border-radius:5px;background:var(--hover);border:1px solid var(--sep);color:var(--fg)">⌃⌘S</span>
+                </div>
+              </div>
+              <div style="padding:6px 4px 0;font-size:11.5px;color:var(--fg3)">固定，不可修改</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 2d 权限 ══ -->
+    <div id="2d" data-screen-label="2d Permissions" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">2d</span>
+        <span style="font:600 16px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">Permissions — 权限</span>
+        <span style="font-size:12px;color:var(--fg3)">必需 3 ＋ 可选 1</span>
+      </div>
+      <div style="width:760px;border-radius:11px;overflow:hidden;background:var(--win);border:1px solid var(--win-brd);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--sep)">
+          <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+          <span style="flex:1;text-align:center;font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);margin-right:60px">QuickBar 设置</span>
+        </div>
+        <div style="display:flex;height:470px">
+          <div style="width:172px;flex:none;background:var(--side);border-right:1px solid var(--sep);padding:10px 8px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg><span>条目</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.2 5.3 8 2.4l5.8 2.9v5.4L8 13.6l-5.8-2.9z"/><path d="M2.2 5.3 8 8.2l5.8-2.9M8 8.2v5.4"/></svg><span>素材批次</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M4 2.6 4 10l1.8-1.6 1.1 2.9 1.5-.6-1.1-2.9H9.7z"/><path d="M11 4.2l1.8-1M11.8 7.2h2M11 10.2l1.8 1"/></svg><span>触发</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;background:var(--accent);color:var(--on-accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.9 13.2 3.4v4.3c0 3.2-2.3 5.4-5.2 6.4-2.9-1-5.2-3.2-5.2-6.4V3.4z"/><rect x="6.2" y="6.6" width="3.6" height="3.4" rx=".8"/><path d="M6.9 6.6V5.7a1.1 1.1 0 0 1 2.2 0v.9"/></svg><span style="font-weight:600">权限</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6"/></svg><span>通用</span></div>
+          </div>
+
+          <div style="flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:center;gap:9px;padding:0 4px">
+              <span style="width:9px;height:9px;border-radius:50%;background:var(--warn)"></span>
+              <span style="font:600 15px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">还差 2 项授权</span>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">必需 · 缺一项就不能用</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden;box-shadow:inset 3px 0 0 var(--warn)">
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px 10px 15px">
+                  <span title="判断当前是不是文件面板、调面板尺寸" style="flex:1">辅助功能</span>
+                  <span style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 6px;border-radius:5px;background:var(--ok-soft);color:var(--ok)"><span style="width:5px;height:5px;border-radius:50%;background:var(--ok)"></span>已授权</span>
+                  <button type="button" disabled style="font:12px/1 -apple-system,'PingFang SC',sans-serif;padding:5px 10px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg3);opacity:.5;cursor:default">去授权</button>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:15px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px 10px 15px">
+                  <span title="接收唤出的双击和快捷键。不记录、不上传任何按键" style="flex:1">输入监控</span>
+                  <span style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 6px;border-radius:5px;background:var(--warn-soft);color:var(--warn)"><span style="width:5px;height:5px;border-radius:50%;background:var(--warn)"></span>未授权</span>
+                  <button type="button" style="font:600 12px/1 -apple-system,'PingFang SC',sans-serif;padding:5px 10px;border-radius:6px;border:none;background:var(--accent);color:var(--on-accent);cursor:pointer">去授权</button>
+                </div>
+                <div style="height:1px;background:var(--sep);margin-left:15px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px 10px 15px">
+                  <span title="读 Finder 最前窗口在哪个文件夹" style="flex:1">自动化 · Finder</span>
+                  <span style="display:flex;align-items:center;gap:5px;font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px 3px 6px;border-radius:5px;background:var(--warn-soft);color:var(--warn)"><span style="width:5px;height:5px;border-radius:50%;background:var(--warn)"></span>未授权</span>
+                  <button type="button" style="font:600 12px/1 -apple-system,'PingFang SC',sans-serif;padding:5px 10px;border-radius:6px;border:none;background:var(--accent);color:var(--on-accent);cursor:pointer">去授权</button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg3)">可选 · 不影响任何功能</div>
+              <div style="border-radius:9px;background:transparent;border:1px dashed var(--field-brd);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px">
+                  <span title="不给也照常更新素材批次，只是不弹横幅" style="flex:1;color:var(--fg2)">通知</span>
+                  <span style="font:600 11px/1 -apple-system,'PingFang SC',sans-serif;padding:3px 7px;border-radius:5px;background:var(--hover);color:var(--fg3)">未授权</span>
+                  <button type="button" style="font:12px/1 -apple-system,'PingFang SC',sans-serif;padding:5px 10px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">去授权</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="max-width:760px;padding:12px 14px;border-radius:10px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.55">
+        <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:6px">实现侧 · 便签</div>
+        必需组：实色卡片 ＋ 左侧 3pt 状态色条（全绿时条变绿）。可选组：虚线框、无色条、灰字 —— <b>形态差异就是「这一项不一样」，不用一句话解释</b>。<br>
+        「通知」不参与计数、不点亮菜单栏橙点。
+      </div>
+    </div>
+
+    <!-- ══ 2e 通用 ══ -->
+    <div id="2e" data-screen-label="2e General" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:9px">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">2e</span>
+        <span style="font:600 16px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">General — 通用</span>
+      </div>
+      <div style="width:760px;border-radius:11px;overflow:hidden;background:var(--win);border:1px solid var(--win-brd);box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;background:var(--bar);border-bottom:1px solid var(--sep)">
+          <span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span>
+          <span style="flex:1;text-align:center;font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);margin-right:60px">QuickBar 设置</span>
+        </div>
+        <div style="display:flex;height:470px">
+          <div style="width:172px;flex:none;background:var(--side);border-right:1px solid var(--sep);padding:10px 8px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1.7 4.6h4.1l1.2 1.4h7.3v6.9a1 1 0 0 1-1 1H2.7a1 1 0 0 1-1-1V4.6z"/></svg><span>条目</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.2 5.3 8 2.4l5.8 2.9v5.4L8 13.6l-5.8-2.9z"/><path d="M2.2 5.3 8 8.2l5.8-2.9M8 8.2v5.4"/></svg><span>素材批次</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M4 2.6 4 10l1.8-1.6 1.1 2.9 1.5-.6-1.1-2.9H9.7z"/><path d="M11 4.2l1.8-1M11.8 7.2h2M11 10.2l1.8 1"/></svg><span>触发</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;color:var(--fg2)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M8 1.9 13.2 3.4v4.3c0 3.2-2.3 5.4-5.2 6.4-2.9-1-5.2-3.2-5.2-6.4V3.4z"/><rect x="6.2" y="6.6" width="3.6" height="3.4" rx=".8"/><path d="M6.9 6.6V5.7a1.1 1.1 0 0 1 2.2 0v.9"/></svg><span>权限</span></div>
+            <div style="display:flex;align-items:center;gap:9px;height:29px;padding:0 9px;border-radius:6px;background:var(--accent);color:var(--on-accent)"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6"/></svg><span style="font-weight:600">通用</span></div>
+          </div>
+
+          <div style="flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">启动</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px"><span style="flex:1">开机自动启动</span><span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span></div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px"><span title="启动时不弹任何窗口，只出现在菜单栏" style="flex:1">静默运行</span><span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">文件面板</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1">记住文件面板尺寸</span>
+                  <span style="font:12px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">1520×1020</span>
+                  <button type="button" title="忘掉记住的尺寸，恢复各应用自己的默认" style="font:12px/1 -apple-system,'PingFang SC',sans-serif;padding:4px 9px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">忘掉</button>
+                  <span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">Finder 窗口</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px"><span style="flex:1">新窗口沿用记住的尺寸</span><span style="width:38px;height:22px;border-radius:11px;background:var(--hover);border:1px solid var(--field-brd);position:relative;flex:none"><span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding:0 4px 6px;font:600 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">更新</div>
+              <div style="border-radius:9px;background:var(--card);border:1px solid var(--sep);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px"><span style="flex:1">自动检查更新</span><span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span></div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px"><span title="下载完成后在下次空闲时替换，不弹窗、不重启前台应用" style="flex:1">静默安装，不打断我</span><span style="width:38px;height:22px;border-radius:11px;background:var(--accent);position:relative;flex:none"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></span></span></div>
+                <div style="height:1px;background:var(--sep);margin-left:12px"></div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px">
+                  <span style="flex:1;color:var(--fg2)">当前版本 <span style="font:12px/1 ui-monospace,Menlo,monospace;color:var(--fg)">1.13.1</span></span>
+                  <button type="button" style="font:12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:5px 11px;border-radius:6px;border:1px solid var(--field-brd);background:var(--field);color:var(--fg);cursor:pointer">立即检查更新</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;外观&quot;}}">
+class Component extends DCLogic {
+  state = { dark: null };
+  get isDark() { return this.state.dark ?? this.props.dark ?? false; }
+  apply() {
+    if (typeof document !== 'undefined')
+      document.documentElement.setAttribute('data-qb', this.isDark ? 'dark' : 'light');
+  }
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); }
+  renderVals() {
+    const on = "font:600 12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 13px;border-radius:6px;border:none;cursor:pointer;background:var(--win);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.18)";
+    const off = "font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;padding:6px 13px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--fg2)";
+    const d = this.isDark;
+    return {
+      lightBtn: d ? off : on,
+      darkBtn: d ? on : off,
+      setLight: () => this.setState({ dark: false }),
+      setDark: () => this.setState({ dark: true }),
+    };
+  }
+}
+</script>
+</body>
+</html>

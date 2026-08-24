@@ -99,7 +99,15 @@ enum Photoshop {
     ///    真实 `count of documents` 校准一次。人手动关掉几张会让它偏大，下一次存回就纠正回来 ——
     ///    比每 1.5 秒往 PS 发一发 AE 划算得多（PS 正忙时那一发要等到它闲下来，见文件头）。
     private(set) static var remaining = 0
+    /// 这一趟总共丢进去几张。药丸底边那条进度线要它（设计稿：`已存回 done / total`）。
+    /// 归零时一起清掉 —— 下一趟是新的一批，进度不该从上一批接着算。
+    private(set) static var total = 0
     private(set) static var busy = false
+
+    /// 已经存回几张。
+    static var done: Int { max(0, total - remaining) }
+    /// 进度（0…1）。没丢过图就是 0，药丸那条线也就不画。
+    static var fraction: Double { total > 0 ? Double(done) / Double(total) : 0 }
 
     /// 数字或忙闲变了。药丸拿它立刻重画，不用等下一次心跳。
     static var onStateChanged: (() -> Void)?
@@ -118,6 +126,7 @@ enum Photoshop {
 
     /// 刚往 PS 里丢了几张。`MainImages.openInPhotoshop` 打开成功之后叫一声。
     static func rememberOpened(_ count: Int) {
+        total += count
         setRemaining(remaining + count)
     }
 
@@ -125,6 +134,7 @@ enum Photoshop {
         let v = max(0, n)
         guard v != remaining else { return }
         remaining = v
+        if v == 0 { total = 0 }
         onStateChanged?()
     }
 

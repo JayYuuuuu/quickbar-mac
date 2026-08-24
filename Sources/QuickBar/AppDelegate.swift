@@ -131,6 +131,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         } else {
             EventTapService.shared.start()
         }
+        // 暂停/恢复要立刻反映到菜单栏那颗图标上（半透 = 已暂停），
+        // 否则唯一的反馈是再打开一次菜单才看得到，等于没反馈。
+        menuBar?.refreshIcon()
     }
 
     private func showSettings(_ section: SettingsSection) {

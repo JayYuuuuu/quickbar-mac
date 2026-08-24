@@ -11,7 +11,7 @@ final class QuickBarPanel: NSPanel {
         case item(QuickItem, pinned: Bool)
     }
 
-    private static let panelWidth: CGFloat = 326
+    private static let panelWidth: CGFloat = 320
     private static let rowHeight: CGFloat = 28
     private static let maxListHeight: CGFloat = 340
     /// 不筛选时快捷条上直接列出来的素材批次条数；再多就要靠输品牌名筛。
@@ -22,7 +22,9 @@ final class QuickBarPanel: NSPanel {
     private let contextLabel = NSTextField(labelWithString: "")
     private let contextAction = NSTextField(labelWithString: "")
     private let filterLabel = NSTextField(labelWithString: "")
-    private let filterIcon = NSImageView()
+    /// 这两个要在 `updateChrome` 里换颜色（面板形态整条变强调色底、有筛选词时输入框描边点亮）。
+    private var contextRow: NSStackView!
+    private var filterBox: NSStackView!
     private let listStack = NSStackView()
     private let scrollView = NSScrollView()
     private let footerLeft = NSTextField(labelWithString: "")
@@ -66,53 +68,55 @@ final class QuickBarPanel: NSPanel {
         effect.blendingMode = .behindWindow
         effect.state = .active
         effect.wantsLayer = true
-        effect.layer?.cornerRadius = 14
+        effect.layer?.cornerRadius = 12
         effect.layer?.masksToBounds = true
         contentView = effect
 
         // 上下文：一行结论，解释都在 tooltip 里
         contextIcon.imageScaling = .scaleProportionallyDown
-        contextLabel.font = .systemFont(ofSize: 11.5)
-        contextLabel.textColor = .secondaryLabelColor
+        contextLabel.font = .systemFont(ofSize: 12)
+        contextLabel.textColor = .labelColor
         contextLabel.lineBreakMode = .byTruncatingMiddle
-        contextAction.font = .systemFont(ofSize: 11, weight: .medium)
+        contextAction.font = .systemFont(ofSize: 12)
         contextAction.textColor = .tertiaryLabelColor
 
-        let contextRow = NSStackView(views: [contextIcon, contextLabel, NSView(), contextAction])
+        // 设计稿 1a/1c：高 32、左右内边距 11、间距 7、图标 14；文件面板形态整条铺 accent-soft。
+        contextRow = NSStackView(views: [contextIcon, contextLabel, NSView(), contextAction])
         contextRow.orientation = .horizontal
-        contextRow.spacing = 6
-        contextRow.edgeInsets = NSEdgeInsets(top: 9, left: 11, bottom: 6, right: 11)
+        contextRow.spacing = 7
+        contextRow.edgeInsets = NSEdgeInsets(top: 0, left: 11, bottom: 0, right: 11)
+        contextRow.wantsLayer = true
+        contextRow.heightAnchor.constraint(equalToConstant: 32).isActive = true
         contextIcon.setContentHuggingPriority(.required, for: .horizontal)
         contextAction.setContentHuggingPriority(.required, for: .horizontal)
-        contextIcon.widthAnchor.constraint(equalToConstant: 13).isActive = true
-        contextIcon.heightAnchor.constraint(equalToConstant: 13).isActive = true
+        contextIcon.widthAnchor.constraint(equalToConstant: 14).isActive = true
+        contextIcon.heightAnchor.constraint(equalToConstant: 14).isActive = true
         contextRow.toolTip = "快捷条会跟着当前上下文改动作：在桌面或 Finder 里是「打开」，在上传/保存窗里变成「跳转到此」。"
 
         // 筛选：直接吃键盘输入，不用 NSTextField，省掉一层焦点管理
-        filterIcon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
-        filterIcon.contentTintColor = .tertiaryLabelColor
+        // 设计稿 1a：一个 26 高、圆角 6、1px 描边的输入框，**没有放大镜图标** ——
+        // 占位文字「输入即可筛选」已经把它是什么说清楚了，再加个图标是重复。
         filterLabel.font = .systemFont(ofSize: 12.5)
-        let filterBox = NSStackView(views: [filterIcon, filterLabel])
+        filterBox = NSStackView(views: [filterLabel])
         filterBox.orientation = .horizontal
         filterBox.spacing = 6
         filterBox.edgeInsets = NSEdgeInsets(top: 0, left: 9, bottom: 0, right: 9)
         filterBox.wantsLayer = true
-        filterBox.layer?.cornerRadius = 8
-        filterBox.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.5).cgColor
-        filterBox.heightAnchor.constraint(equalToConstant: 27).isActive = true
-        filterIcon.widthAnchor.constraint(equalToConstant: 12).isActive = true
+        filterBox.layer?.cornerRadius = 6
+        filterBox.layer?.borderWidth = 1
+        filterBox.heightAnchor.constraint(equalToConstant: 26).isActive = true
 
         filterBox.toolTip = "支持拼音：「下载」可以输 xiazai，也可以只输首字母 xz。"
         let filterRow = NSStackView(views: [filterBox])
         filterRow.orientation = .horizontal
-        filterRow.edgeInsets = NSEdgeInsets(top: 0, left: 9, bottom: 4, right: 9)
+        filterRow.edgeInsets = NSEdgeInsets(top: 7, left: 9, bottom: 3, right: 9)
         filterBox.widthAnchor.constraint(equalTo: filterRow.widthAnchor, constant: -18).isActive = true
 
         // 列表
         listStack.orientation = .vertical
-        listStack.spacing = 1
+        listStack.spacing = 0
         listStack.alignment = .leading
-        listStack.edgeInsets = NSEdgeInsets(top: 0, left: 7, bottom: 6, right: 7)
+        listStack.edgeInsets = NSEdgeInsets(top: 2, left: 6, bottom: 6, right: 6)
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
@@ -135,12 +139,18 @@ final class QuickBarPanel: NSPanel {
         footerRight.textColor = .secondaryLabelColor
         let footer = NSStackView(views: [footerLeft, NSView(), footerRight])
         footer.orientation = .horizontal
-        footer.edgeInsets = NSEdgeInsets(top: 6, left: 11, bottom: 7, right: 11)
+        footer.edgeInsets = NSEdgeInsets(top: 0, left: 11, bottom: 0, right: 11)
+        footer.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        footer.wantsLayer = true
+        footer.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.5).cgColor
 
         let separator = NSBox()
         separator.boxType = .separator
 
-        let root = NSStackView(views: [contextRow, filterRow, scrollView, separator, footer])
+        let contextSeparator = NSBox()
+        contextSeparator.boxType = .separator
+
+        let root = NSStackView(views: [contextRow, contextSeparator, filterRow, scrollView, separator, footer])
         root.orientation = .vertical
         root.spacing = 0
         root.alignment = .leading
@@ -153,6 +163,7 @@ final class QuickBarPanel: NSPanel {
             root.topAnchor.constraint(equalTo: effect.topAnchor),
             root.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
             contextRow.widthAnchor.constraint(equalTo: root.widthAnchor),
+            contextSeparator.widthAnchor.constraint(equalTo: root.widthAnchor),
             filterRow.widthAnchor.constraint(equalTo: root.widthAnchor),
             scrollView.widthAnchor.constraint(equalTo: root.widthAnchor),
             separator.widthAnchor.constraint(equalTo: root.widthAnchor),
@@ -300,14 +311,26 @@ final class QuickBarPanel: NSPanel {
         for (index, entry) in entries.enumerated() {
             switch entry {
             case .header(let title):
+                // 设计稿 1a：分组之间插一条分隔线（第一组前面不插），标题 11pt semibold。
+                if pieces > 0 {
+                    let line = NSBox()
+                    line.boxType = .separator
+                    let holder = NSStackView(views: [line])
+                    holder.edgeInsets = NSEdgeInsets(top: 6, left: 7, bottom: 0, right: 7)
+                    listStack.addArrangedSubview(holder)
+                    holder.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
+                    line.widthAnchor.constraint(equalTo: holder.widthAnchor, constant: -14).isActive = true
+                    contentListHeight += 7
+                    pieces += 1
+                }
                 let label = NSTextField(labelWithString: title)
-                label.font = .systemFont(ofSize: 10.5, weight: .semibold)
+                label.font = .systemFont(ofSize: 11, weight: .semibold)
                 label.textColor = .tertiaryLabelColor
                 let wrapper = NSStackView(views: [label])
-                wrapper.edgeInsets = NSEdgeInsets(top: 8, left: 9, bottom: 3, right: 9)
+                wrapper.edgeInsets = NSEdgeInsets(top: pieces == 0 ? 8 : 2, left: 6, bottom: 3, right: 6)
                 listStack.addArrangedSubview(wrapper)
                 wrapper.widthAnchor.constraint(equalTo: listStack.widthAnchor).isActive = true
-                contentListHeight += 25
+                contentListHeight += pieces == 0 ? 25 : 19
                 pieces += 1
 
             case .item(let item, let pinned):
@@ -339,12 +362,17 @@ final class QuickBarPanel: NSPanel {
     }
 
     private func updateChrome() {
+        let accent = NSColor.controlAccentColor
         if let context = panelContext {
             contextIcon.image = NSImage(systemSymbolName: "tray.and.arrow.up", accessibilityDescription: nil)
-            contextIcon.contentTintColor = .controlAccentColor
+            contextIcon.contentTintColor = accent
             contextLabel.stringValue = "\(context.kind == .save ? "保存窗" : "上传窗") · \(context.ownerName ?? "未知应用")"
             contextAction.stringValue = "跳转"
-            contextAction.textColor = .controlAccentColor
+            contextAction.font = .systemFont(ofSize: 12, weight: .semibold)
+            contextAction.textColor = accent
+            // 设计稿 1c：文件面板形态整条铺一层强调色底 —— 这是快捷条唯一会改变形态的时候，
+            // 值得让人一眼看出「现在按回车不是打开，是跳转」。
+            contextRow.layer?.backgroundColor = accent.withAlphaComponent(0.13).cgColor
             footerLeft.stringValue = filter.isEmpty ? "↩ 跳转到此" : "筛选：\(filter)"
             if let size = Store.shared.settings.panelSize {
                 footerRight.stringValue = "尺寸 \(Int(size.width))×\(Int(size.height)) 已记住"
@@ -357,12 +385,24 @@ final class QuickBarPanel: NSPanel {
             contextIcon.contentTintColor = nil
             contextLabel.stringValue = "Finder · \(FinderService.shared.currentName)"
             contextAction.stringValue = "打开"
+            contextAction.font = .systemFont(ofSize: 12)
             contextAction.textColor = .tertiaryLabelColor
+            contextRow.layer?.backgroundColor = NSColor.clear.cgColor
             footerLeft.stringValue = filter.isEmpty ? "↑↓ 选择 · ↩ 打开" : "筛选：\(filter)"
             footerRight.stringValue = ""
         }
+        // 有筛选词就把输入框点亮（设计稿 1b：1.5px 强调色描边 + 一层很淡的底）。
+        // 光晕（`box-shadow 0 0 0 3px`）在 AppKit 里要再套一层视图，收益不抵复杂度，只做描边和底。
+        let typing = !filter.isEmpty
+        filterBox.layer?.borderWidth = typing ? 1.5 : 1
+        filterBox.layer?.borderColor = (typing ? accent : NSColor.separatorColor).cgColor
+        filterBox.layer?.backgroundColor = typing
+            ? accent.withAlphaComponent(0.10).cgColor
+            : NSColor.textBackgroundColor.withAlphaComponent(0.5).cgColor
         filterLabel.stringValue = filter.isEmpty ? "输入即可筛选" : filter
         filterLabel.textColor = filter.isEmpty ? .tertiaryLabelColor : .labelColor
+        // 筛选态右下角给一条出路：不写的话「怎么把它清掉」只能靠试（设计稿 1b）。
+        if typing, panelContext == nil { footerRight.stringValue = "⎋ 清空" }
     }
 
     private func resizeToFit() {
@@ -475,21 +515,34 @@ private final class RowView: NSView {
     private let badge = NSTextField(labelWithString: "")
     private let runningDot = NSView()
     private let disabled: Bool
+    private var pinned = false
+    /// 右侧那行的固有颜色（素材批次的上传状态用）。nil = 跟着普通次要色。
+    private var tone: NSColor?
 
     init(item: QuickItem, pinned: Bool, disabled: Bool, note: String?, icon: NSImage) {
         self.disabled = disabled
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 7
+        // 设计稿 1a：普通行圆角 6；置顶那张卡片圆角 8、带强调色描边。
+        layer?.cornerRadius = pinned ? 8 : 6
+        if pinned {
+            layer?.borderWidth = 1
+            layer?.borderColor = NSColor.controlAccentColor.cgColor
+            layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.5).cgColor
+        }
+        self.pinned = pinned
 
         iconView.image = icon
         iconView.imageScaling = .scaleProportionallyDown
 
-        nameLabel.font = .systemFont(ofSize: 13)
+        nameLabel.font = pinned ? .systemFont(ofSize: 12.5, weight: .semibold) : .systemFont(ofSize: 13)
         nameLabel.stringValue = item.name
         nameLabel.lineBreakMode = .byTruncatingTail
 
-        detailLabel.font = .systemFont(ofSize: pinned ? 10.5 : 11)
+        // 置顶那张卡片第二行是完整路径，等宽字体读起来更像"地址"（设计稿 1c）。
+        detailLabel.font = pinned
+            ? .monospacedSystemFont(ofSize: 10.5, weight: .regular)
+            : .systemFont(ofSize: 11.5)
         detailLabel.textColor = .secondaryLabelColor
         detailLabel.lineBreakMode = .byTruncatingMiddle
         detailLabel.alignment = .right
@@ -500,11 +553,17 @@ private final class RowView: NSView {
                 ? "接回这个卷就能用了。QuickBar 不会因为找不到就把条目删掉。"
                 : "\(item.path) 已经不在了。右键可以移除这个条目。"
         } else if pinned {
-            detailLabel.stringValue = "Finder 当前"
+            // 设计稿 1c：第二行写完整路径（人要确认跳的是不是同名的另一个目录），
+            // 右上角一枚实底徽标点明这行的身份。
+            detailLabel.stringValue = item.path
             detailLabel.alignment = .left
-            badge.stringValue = "⌘G"
-            badge.font = .systemFont(ofSize: 10.5, weight: .medium)
-            badge.textColor = .secondaryLabelColor
+            detailLabel.textColor = .tertiaryLabelColor
+            badge.stringValue = " Finder 当前 "
+            badge.font = .systemFont(ofSize: 10, weight: .semibold)
+            badge.textColor = .white
+            badge.wantsLayer = true
+            badge.layer?.cornerRadius = 4
+            badge.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
         } else if disabled {
             detailLabel.stringValue = "面板内不可用"
             toolTip = "文件面板里没有「启动应用」这个动作。"
@@ -513,6 +572,12 @@ private final class RowView: NSView {
         } else if let subtitle = item.subtitle, !subtitle.isEmpty {
             // 来源自己写好的一行结论（素材批次的件数/进度）比紧凑路径有用得多。
             detailLabel.stringValue = subtitle
+            // 设计稿 1a 给上传状态定了颜色：传完了绿、差几张橙、正在传就跟着普通次要色。
+            // 🔴 靠文案判断，不给 `QuickItem` 加字段 —— 那是要落盘的结构，
+            //    给它加非 Optional 字段会让老 items.json 解不开（见 CLAUDE.md）。
+            //    这三个词是 MaterialFeed 自己拼的，就在同一个仓库里，改了这儿会一起改。
+            if subtitle.contains("已传") { tone = .systemGreen }
+            else if subtitle.contains("差") { tone = .systemOrange }
             toolTip = item.path
         } else {
             detailLabel.stringValue = item.compactPath
@@ -541,7 +606,7 @@ private final class RowView: NSView {
             : [iconView, text, runningDot, NSView(), detailLabel])
         stack.orientation = .horizontal
         stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: pinned ? 8 : 7, bottom: 0, right: pinned ? 8 : 7)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
@@ -549,8 +614,8 @@ private final class RowView: NSView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 18),
-            iconView.heightAnchor.constraint(equalToConstant: 18),
+            iconView.widthAnchor.constraint(equalToConstant: pinned ? 16 : 14),
+            iconView.heightAnchor.constraint(equalToConstant: pinned ? 16 : 14),
             runningDot.widthAnchor.constraint(equalToConstant: 5),
             runningDot.heightAnchor.constraint(equalToConstant: 5)
         ])
@@ -570,10 +635,20 @@ private final class RowView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func applyColors() {
-        layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
-        let onAccent = isSelected
+        if pinned {
+            // 置顶卡片本来就有强调色描边，选中时只把底加深，别整块刷成实底 ——
+            // 那样它跟普通选中行就分不出来了（设计稿 1c 里它是一张卡片，不是一行）。
+            layer?.backgroundColor = (isSelected
+                ? NSColor.controlAccentColor.withAlphaComponent(0.16)
+                : NSColor.textBackgroundColor.withAlphaComponent(0.5)).cgColor
+        } else {
+            layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.cgColor : NSColor.clear.cgColor
+        }
+        let onAccent = isSelected && !pinned
         nameLabel.textColor = onAccent ? .white : .labelColor
-        detailLabel.textColor = onAccent ? NSColor.white.withAlphaComponent(0.75) : .secondaryLabelColor
+        detailLabel.textColor = onAccent
+            ? NSColor.white.withAlphaComponent(0.85)
+            : (tone ?? (pinned ? .tertiaryLabelColor : .secondaryLabelColor))
         badge.textColor = onAccent ? NSColor.white.withAlphaComponent(0.85) : .secondaryLabelColor
     }
 

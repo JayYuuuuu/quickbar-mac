@@ -28,6 +28,16 @@ enum Permissions {
             }
         }
 
+        /// 引导页和设置页那一行左边的图标（设计稿 1f）。
+        var symbol: String {
+            switch self {
+            case .accessibility: return "smallcircle.filled.circle"
+            case .inputMonitoring: return "keyboard"
+            case .automation: return "macwindow"
+            case .notifications: return "bell"
+            }
+        }
+
         /// 一句话说清「没有它会怎样」，界面上只在 tip 里出现。
         var why: String {
             switch self {

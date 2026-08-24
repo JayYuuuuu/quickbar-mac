@@ -120,6 +120,14 @@ final class WindowFollow {
 
     // MARK: - 位置
 
+    /// 宿主窗口被最小化了。设计稿要求这时候把药丸收掉 ——
+    /// 它是「附着在这个窗口上」的东西，窗口进了程序坞它还浮着就成了孤儿。
+    /// （被别的窗口遮挡不用单独判：药丸只在宿主是最前面那个应用时才出现。）
+    var hostMinimized: Bool {
+        guard let win = windowElement else { return false }
+        return AX.value(win, kAXMinimizedAttribute) as Bool? ?? false
+    }
+
     /// 正在跟的那个窗口，换算成 AppKit 坐标之后的矩形。拿不到就是 nil。
     var frame: CGRect? {
         guard let win = windowElement else { return nil }
