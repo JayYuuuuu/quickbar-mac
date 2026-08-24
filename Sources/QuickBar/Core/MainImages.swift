@@ -38,16 +38,16 @@ enum MainImages {
     /// 把这些路径里的主图丢进 Photoshop。路径可以是：单张图 / `主图` 目录 / 商品文件夹 / 批次目录。
     static func openInPhotoshop(_ paths: [String]) {
         guard !paths.isEmpty else {
-            Notify.tell("不知道要开哪儿的主图", "先在 Finder 里选中商品文件夹（或那一批），再来一次。")
+            Notify.problem("不知道要开哪儿的主图", "先在 Finder 里选中商品文件夹（或那一批），再来一次。")
             return
         }
         let images = collect(from: paths)
         guard !images.isEmpty else {
-            Notify.tell("这儿没找到主图", "认的是商品文件夹里的 `主图/`（也可以直接选批次目录或图片本身）。")
+            Notify.problem("这儿没找到主图", "认的是商品文件夹里的 `主图/`（也可以直接选批次目录或图片本身）。")
             return
         }
         guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: photoshopBundleID) else {
-            Notify.tell("没找到 Photoshop", "这台机器上没装，或者装的版本换了 bundle id（当前认的是 \(photoshopBundleID)）。")
+            Notify.problem("没找到 Photoshop", "这台机器上没装，或者装的版本换了 bundle id（当前认的是 \(photoshopBundleID)）。")
             return
         }
         if images.count > ASK_OVER {
@@ -61,7 +61,7 @@ enum MainImages {
         NSWorkspace.shared.open(images, withApplicationAt: app, configuration: cfg) { _, error in
             DispatchQueue.main.async {
                 if let error {
-                    Notify.tell("Photoshop 没能打开这些图", error.localizedDescription)
+                    Notify.problem("Photoshop 没能打开这些图", error.localizedDescription)
                     return
                 }
                 // 丢进去几张，收尾那半边（「存回原位」，见 Core/Photoshop.swift）就知道还剩几张要修。

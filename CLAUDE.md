@@ -146,6 +146,14 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   超时兜底除了说话，还必须 `thread = nil` 换一条新的 —— 不然一次卡死之后这功能到重启为止都是哑的。
 - 🔴 **存回去用 `file path of d` 拿到的 alias，不拼路径字符串**。素材盘是 SMB，
   服务端读到的目录名和访达呈现的可能差一次 Unicode 归一化（URLScheme 那节已经吃过一次）。
+- 🔴 **`POSIX path of` 绝不能写在 `tell application id "com.adobe.Photoshop"` 块里面。**
+  PS 的字典里有一整套 **Path Suite**（`path item` / `path name` / `entire path` / `target path`…，
+  贝塞尔路径那套），`path` 这个词被它抢走，`POSIX path of x` 于是被送给 PS 而不是交给
+  StandardAdditions，PS 不认 → 报错。1.12.0 就栽在这儿：从 Finder 丢进去的图也一律走进
+  「这张没有原始路径」。**取出来、出了 `tell` 块再转**（Adobe 自己的示例也是这么写的）。
+  Finder 没有 `path` 术语，所以 `FinderService` 里同样的写法一直没事 —— 别拿那边的经验推这边。
+  连带的口径：**判「能不能存回」看 `file path` 拿没拿到，不看 POSIX 串**；认扩展名用
+  `name of current document`。POSIX 串只用来显示和 reveal，它失败不该挡住写盘。
 - 🔴 **只认 jpg / png**。覆盖写回意味着原图没了，猜错格式的代价是一张烧进 JPEG 块的 PNG，
   人不会立刻发现。别的扩展名明说跳过。
 - 🔴 **`saveAllScript` 从最后一个往前数着走**（`repeat with i from (count of documents) to 1 by -1`）：
@@ -153,7 +161,16 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   写成 `repeat while (count of documents) > 0` 则会被「跳过但不关」的文档卡成死循环。
 - **药丸的数字不问 PS**（`Photoshop.remaining`）：QuickBar 自己记丢进去几张，
   每存回一张拿 PS 回的真实 `count of documents` 校准。心跳里发 AE = PS 忙时整条心跳陪着卡。
-- 改 AppleScript 之后**先在 Mac 上 `osacompile` 过一遍**再信它：
+- 🔴 **动作失败一律 `Notify.problem`（弹框），不能用 `Notify.tell`（通知）。**
+  专注模式 / 「通知样式：无」会把横幅**整条吞掉**：2026-08-24 实测，「存回原位」连点三次、
+  三条通知全部投递成功（日志里 `Added notification request … hasError: 0`），人一条都没看见，
+  表现就是「按了没反应」，为此白查了一轮。
+- 🔴 **远程排查看 `~/Library/Logs/QuickBar.log`，别指望 `log show`。**
+  `log show --predicate 'process == "QuickBar"'` 是能跑的（早先记的「拿不到」不准确），
+  但 NSLog 的**正文是 `<private>`**，只看得到一行占位符 —— 能看出「点击到了 / 脚本跑了 /
+  发了通知」这类骨架，看不到任何内容。`Notify.log` 现在同时落一份明文到那个文件。
+- 改 AppleScript 之后**先在 Mac 上 `osacompile` 过一遍**再信它 —— 但注意
+  **`osacompile` 只管语法，管不了术语被抢**（上面那条 `POSIX path` 编译一路绿灯，运行才炸）：
   `python3` 把 `Photoshop.swift` 里的字面量抠出来、替掉插值，`scp` 上去 `osacompile -o /tmp/x.scpt`。
   PS 的术语只有它自己的 sdef 说了算，Swift 编译器一个字都帮不上。
 

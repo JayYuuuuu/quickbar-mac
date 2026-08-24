@@ -104,31 +104,35 @@ enum Photoshop {
         guard start() else { return }
         Bridge.run(infoScript, readOnly: true) { text in
             guard let text else { setBusy(false); return }   // 出错的话 Bridge 已经说过了
-            let lines = text.components(separatedBy: "\n")
-            let count = Int(lines.first?.trimmingCharacters(in: .whitespaces) ?? "") ?? 0
-            let path = lines.count > 1 ? lines[1] : ""
+            let info = Info(text)
 
-            guard count > 0 else {
+            guard info.count > 0 else {
                 setBusy(false)
                 setRemaining(0)
-                Notify.tell("Photoshop 里没有打开的图", "「存回原位」只处理 PS 当前那张。")
+                Notify.problem("Photoshop 里没有打开的图", "「存回原位」只处理 PS 当前那张。")
                 return
             }
-            guard !path.isEmpty else {
+            guard info.hasPath else {
                 setBusy(false)
-                Notify.tell("这张没有原始路径", "它不是从文件打开的（比如是新建的文档），存回哪儿只能你自己定。")
+                Notify.problem("这张没有原始路径",
+                               "「\(info.name.isEmpty ? "当前文档" : info.name)」不是从文件打开的"
+                               + "（比如是新建的、或者已经被你另存成别的了），存回哪儿只能你自己定。"
+                               + (info.why.isEmpty ? "" : "\n\nPhotoshop 说：\(info.why)"))
                 return
             }
-            guard let format = Format.of(path) else {
+            // 🔴 认扩展名用**文档名**，不用 POSIX 串：POSIX 那一步可能失败（见 infoScript），
+            //    但只要 `file path` 在，存回去就是能成的，不该被一个显示用的字段挡住。
+            guard let format = Format.of(info.name) else {
                 setBusy(false)
-                let ext = (path as NSString).pathExtension
-                Notify.tell("这张不敢替你覆盖", "覆盖存回只认 jpg 和 png，当前这张是「\(ext.isEmpty ? "没有扩展名" : ext)」。")
+                let ext = (info.name as NSString).pathExtension
+                Notify.problem("这张不敢替你覆盖",
+                               "覆盖存回只认 jpg 和 png，「\(info.name)」是「\(ext.isEmpty ? "没有扩展名" : ext)」。")
                 return
             }
             Bridge.run(saveFrontScript(format)) { out in
                 setBusy(false)
                 guard let out else { return }
-                report(out, path: path)
+                report(out, name: info.name, path: info.path)
             }
         }
     }
@@ -137,7 +141,7 @@ enum Photoshop {
     /// 循环在脚本里跑，不是几十个来回 —— PS 每回一次都要它闲下来。
     static func saveBackAll() {
         guard isRunning else {
-            Notify.tell("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
+            Notify.problem("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
             return
         }
         guard !busy else { return }
@@ -157,7 +161,7 @@ enum Photoshop {
             var body = "存回 \(done) 张。"
             if skipped > 0 { body += "跳过 \(skipped) 张（不是 jpg / png，没敢覆盖）。" }
             if failed > 0 { body += "失败 \(failed) 张：\(lastErr)" }
-            Notify.tell(failed > 0 ? "有几张没存回去" : "全部存回原位", body)
+            if failed > 0 { Notify.problem("有几张没存回去", body) } else { Notify.tell("全部存回原位", body) }
         }
     }
 
@@ -165,15 +169,18 @@ enum Photoshop {
     /// 存回原位之后其实用不着了，但偶尔要去翻同一件商品的别的图。
     static func revealFront() {
         guard isRunning else {
-            Notify.tell("Photoshop 没在跑", "这一项是「把 PS 当前那张所在的文件夹打开」。")
+            Notify.problem("Photoshop 没在跑", "这一项是「把 PS 当前那张所在的文件夹打开」。")
             return
         }
         Bridge.run(infoScript, readOnly: true) { text in
             guard let text else { return }
-            let lines = text.components(separatedBy: "\n")
-            let path = lines.count > 1 ? lines[1] : ""
+            let info = Info(text)
+            let path = info.path
             guard !path.isEmpty else {
-                Notify.tell("PS 当前这张没有原始路径", "它不是从文件打开的，访达里没有对应的位置。")
+                Notify.problem("PS 当前这张在访达里找不到",
+                               info.count == 0 ? "Photoshop 里没有打开的图。"
+                                               : "它不是从文件打开的，访达里没有对应的位置。"
+                                                 + (info.why.isEmpty ? "" : "\n\nPhotoshop 说：\(info.why)"))
                 return
             }
             let url = URL(fileURLWithPath: path)
@@ -182,9 +189,9 @@ enum Photoshop {
                 let dir = url.deletingLastPathComponent()
                 if FileManager.default.fileExists(atPath: dir.path) {
                     Actions.openFolder(dir.path)
-                    Notify.tell("那张图已经不在盘上了", "先开了它所在的文件夹：\(dir.lastPathComponent)")
+                    Notify.problem("那张图已经不在盘上了", "先开了它所在的文件夹：\(dir.lastPathComponent)")
                 } else {
-                    Notify.tell("找不到那张图了", path)
+                    Notify.problem("找不到那张图了", path)
                 }
                 return
             }
@@ -198,39 +205,90 @@ enum Photoshop {
     private static func start() -> Bool {
         guard !busy else { return false }
         guard isRunning else {
-            Notify.tell("Photoshop 没在跑", "「存回原位」是把 PS 当前那张按原路径覆盖存回。")
+            Notify.problem("Photoshop 没在跑", "「存回原位」是把 PS 当前那张按原路径覆盖存回。")
             return false
         }
         setBusy(true)
         return true
     }
 
-    private static func report(_ out: String, path: String) {
+    private static func report(_ out: String, name: String, path: String) {
         let lines = out.components(separatedBy: "\n")
-        let name = (path as NSString).lastPathComponent
         guard lines.first == "OK" else {
             let msg = lines.count > 2 ? lines[2] : out
-            Notify.tell("这张没能存回去", "\(name)：\(msg)\n原图没有被改动。")
+            Notify.problem("这张没能存回去", "\(name)：\(msg)\n原图没有被改动。")
             return
         }
         // PS 关掉这张之后自己数的，比我们递减准 —— 人中途手动关过几张也能校回来。
         setRemaining(Int(lines.count > 1 ? lines[1].trimmingCharacters(in: .whitespaces) : "") ?? (remaining - 1))
-        NSLog("[QuickBar] 存回 \(path)，PS 里还剩 \(remaining) 张")
+        Notify.log("存回 \(path.isEmpty ? name : path)，PS 里还剩 \(remaining) 张")
+    }
+
+    /// `infoScript` 回来的五行。
+    private struct Info {
+        let count: Int
+        let name: String
+        let hasPath: Bool
+        let path: String
+        let why: String
+
+        init(_ text: String) {
+            let l = text.components(separatedBy: "\n")
+            func at(_ i: Int) -> String {
+                i < l.count ? l[i].trimmingCharacters(in: .whitespaces) : ""
+            }
+            count = Int(at(0)) ?? 0
+            name = at(1)
+            hasPath = at(2) == "1"
+            // 路径不 trim：文件名两头理论上可以有空格
+            path = l.count > 3 ? l[3] : ""
+            why = at(4)
+        }
     }
 
     // MARK: - 脚本
 
-    /// 只读：打开了几个文档、最前那个的原始路径。每次动作的第一发都是它（见文件头第二条）。
+    /// 只读探测：打开了几个文档、最前那个叫什么、有没有原始路径、路径是什么、失败的话为什么。
+    /// 每次动作的第一发都是它（见文件头第二条）。
+    ///
+    /// 🔴 **`POSIX path of` 必须放在 `tell` 块外面求值**。第一版写在块里：
+    ///    `set p to POSIX path of (file path of current document)` —— 从 Finder 丢进 PS 的图
+    ///    也会走进「这张没有原始路径」（2026-08-24 实测）。`POSIX path` 是 StandardAdditions 的词，
+    ///    在 `tell application` 块里会先被送给目标应用，Photoshop 不认就报错，被 `try` 吞掉，
+    ///    结果看起来像「文档没有路径」。Adobe 自己的示例也是取出来再转。
+    /// 🔴 **判「能不能存回」看的是 `file path` 拿没拿到，不是 POSIX 串**：
+    ///    真正写盘用的是那个 alias（`save d in p`），POSIX 串只用来认扩展名和说人话。
+    /// 🔴 **失败原因要带回来**（最后一行 `why`）。上一版这里只回一个空串，
+    ///    于是「为什么空」在机器外面永远查不出来。
     private static let infoScript = """
+    set n to 0
+    set nm to ""
+    set p to ""
+    set why to ""
+    set f to missing value
     tell application id "\(bundleID)"
         set n to (count of documents)
-        if n is 0 then return "0"
-        set p to ""
-        try
-            set p to POSIX path of (file path of current document)
-        end try
-        return (n as text) & linefeed & p
+        if n > 0 then
+            try
+                set nm to name of current document
+            end try
+            try
+                set f to file path of current document
+            on error errMsg
+                set why to "file path: " & errMsg
+            end try
+        end if
     end tell
+    if f is not missing value then
+        try
+            set p to POSIX path of f
+        on error errMsg2
+            set why to "POSIX path: " & errMsg2
+        end try
+    end if
+    set hasPath to "0"
+    if f is not missing value then set hasPath to "1"
+    return (n as text) & linefeed & nm & linefeed & hasPath & linefeed & p & linefeed & why
     """
 
     /// `flatten` 对本来就只有一个背景图层的文档会报「当前不可用」，所以单独 try 起来。
@@ -329,7 +387,7 @@ extension Photoshop {
                 //    所以把它丢掉换一条新的 —— 不然一次卡死之后这个功能到重启为止都是哑的。
                 //    旧线程等 PS 回话之后会自己空转下去，`settled` 已经是 true，结果会被丢弃。
                 thread = nil
-                Notify.tell("Photoshop 一直没回话",
+                Notify.problem("Photoshop 一直没回话",
                             "它多半正压着一个对话框（存储进度、生成式填充、缺字体提示…），"
                             + "也可能是第一次用、屏幕上正等你点「允许」。\n处理掉那个框再按一次。")
                 done(nil)
@@ -381,7 +439,7 @@ extension Photoshop {
             // 「空、而且没有报错」正是那个静默失败的签名。只读的才敢重来。
             if fromBackground, box.readOnly, !mainThreadOnly {
                 mainThreadOnly = true
-                NSLog("[QuickBar] AppleScript 在专用线程上返回空，之后改走主线程")
+                Notify.log("AppleScript 在专用线程上返回空，之后改走主线程")
                 execOnMain(box)
                 return
             }
@@ -391,18 +449,18 @@ extension Photoshop {
         private static func explain(_ error: NSDictionary) {
             let num = (error[NSAppleScript.errorNumber] as? Int) ?? 0
             let msg = (error[NSAppleScript.errorMessage] as? String) ?? ""
-            NSLog("[QuickBar] Photoshop AppleScript 失败 \(num)：\(msg)")
+            Notify.log("Photoshop AppleScript 失败 \(num)：\(msg)")
             switch num {
             case -1743:
-                Notify.tell("QuickBar 还不能控制 Photoshop",
+                Notify.problem("QuickBar 还不能控制 Photoshop",
                             "去「系统设置 → 隐私与安全性 → 自动化」，把 QuickBar 底下的 Photoshop 打开。")
                 NSWorkspace.shared.open(Permissions.Kind.automation.settingsURL)
             case -600, -609:
-                Notify.tell("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
+                Notify.problem("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
             case -1712:
-                Notify.tell("Photoshop 没回话", "它多半正压着一个对话框。处理掉那个框再按一次。")
+                Notify.problem("Photoshop 没回话", "它多半正压着一个对话框。处理掉那个框再按一次。")
             default:
-                Notify.tell("跟 Photoshop 说话失败", msg.isEmpty ? "错误 \(num)" : "\(msg)（错误 \(num)）")
+                Notify.problem("跟 Photoshop 说话失败", msg.isEmpty ? "错误 \(num)" : "\(msg)（错误 \(num)）")
             }
         }
     }
