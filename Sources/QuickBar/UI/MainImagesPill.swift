@@ -171,17 +171,22 @@ final class MainImagesPill {
         probing = true
         probe.async { [weak self] in
             let images = MainImages.collect(from: Array(paths.prefix(200)))
-            let folders = Set(images.map { $0.deletingLastPathComponent().path }).count
+            // 🔴 数「几件」要往上跳**两层**：图在 `<商品>/主图/` 和 `<商品>/主图1比1/` 里，
+            //    只跳一层数出来的是子目录数（每件两个），写在药丸上就成了件数翻倍。
+            let products = Set(images.map {
+                $0.deletingLastPathComponent().deletingLastPathComponent().path
+            }).count
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.probing = false
                 guard self.mode == .finder else { return }
                 guard !images.isEmpty, paths != acted else { self.hide(); return }
                 self.pending = paths
-                // 每件只开首图，所以「几张」就是「几件」，不用两个数（folders 留着是为了万一 FIRST_ONLY 关掉）
-                let title = images.count == folders
+                // 一件商品现在开两张（3 比 4 一张、1 比 1 一张），所以「几件」和「几张」都得写；
+                // 只选中一件、或者只选中单张图时两个数一样，那就只写张数。
+                let title = images.count == products
                     ? "主图丢进 PS · \(images.count) 张"
-                    : "主图丢进 PS · \(folders) 件 \(images.count) 张"
+                    : "主图丢进 PS · \(products) 件 \(images.count) 张"
                 self.show(title: title,
                           tip: "把选中的商品文件夹里的「主图」全部在 Photoshop 里打开。"
                              + "不想要它浮出来：设置 → 素材批次里关掉。")
