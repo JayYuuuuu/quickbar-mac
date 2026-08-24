@@ -57,9 +57,17 @@ final class MainImagesPill {
     private var selectionDirty = true
     private var lastFinderProbe = Date.distantPast
     private var inputProbe: DispatchWorkItem?
-    /// 兜底轮询间隔。事件 tap 看不到的改选中（脚本、拖放落点、别的应用代为操作）
-    /// 靠它接住；1.5 秒的心跳仍在跑，只是不再每跳都去问访达。
-    private static let finderFallbackPoll: TimeInterval = 8
+    /// 兜底轮询间隔。
+    ///
+    /// 事件 tap 看得见点击和按键，所以拖放（有 `leftMouseUp`）、右键、方向键、打字选中
+    /// 全都不用轮询也能覆盖；别的应用「在访达中显示」某个文件会把访达激活，激活通知也接住了。
+    /// **真正漏掉的只有一类**：脚本 `tell application "Finder" to select …`，
+    /// 而且访达当时已经在最前。就为这一类留着这条慢轮询。
+    ///
+    /// 🔴 **它只负责「药丸出现得早一点」，不再负责正确性** —— 点下去那一刻会现查一次
+    ///    （见 `act`），所以哪怕这里漏了，也不会拿过期的路径去开图。正因为如此它才敢放到 30 秒：
+    ///    30 秒一次 ≈ 0.1% 单核，而原来每 1.5 秒一次是 1.6%。
+    private static let finderFallbackPoll: TimeInterval = 30
     /// 输入之后隔多久去问一次。太短会在连点里问好几遍，太长人就觉得"慢半拍"。
     private static let inputDebounce: TimeInterval = 0.12
 
@@ -413,8 +421,16 @@ final class MainImagesPill {
     private func act() {
         switch mode {
         case .finder:
-            let paths = pending
+            // 🔴 **点下去这一刻现查一次。** 药丸上那组路径是上一次探测留下的；
+            //    中间要是被脚本改过选中项，照着旧的开就是**开错东西** ——
+            //    那比"慢半拍"严重得多。一发 AppleScript 约 24ms，人主动点的，无感。
+            //    查到不一样就按**现在真正选中的**来（人的意图是"把我选中的这些丢进去"），
+            //    数量对不上也不危险：`openInPhotoshop` 超过 30 张本来就会再问一声。
+            //    拿不到（访达一个窗口都没有）才退回药丸上那组，绝不让这一下"没反应"。
+            let fresh = FinderService.shared.selectionNow()
+            let paths = fresh.isEmpty ? pending : fresh
             actedSelection = paths
+            lastSelection = paths
             hide()
             MainImages.openInPhotoshop(paths)
         case .photoshop:
