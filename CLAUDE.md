@@ -146,6 +146,11 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   超时兜底除了说话，还必须 `thread = nil` 换一条新的 —— 不然一次卡死之后这功能到重启为止都是哑的。
 - 🔴 **存回去用 `file path of d` 拿到的 alias，不拼路径字符串**。素材盘是 SMB，
   服务端读到的目录名和访达呈现的可能差一次 Unicode 归一化（URLScheme 那节已经吃过一次）。
+- 🔴 **JPEG 存第 9 档，不是 12。** 存回的是一张**本来就压过**的图，12 档只会把体积翻一倍：
+  真素材 1440×1920 实测 —— 原图 732,600 字节（亮度量化均值 12.7）、q9 684,460（10.4）、
+  q12 1,476,300（1.7）。多出来的精度大半花在保留原图自己的压缩痕迹上，而图传上淘宝还会被
+  平台再压一次。**别往 6 以下降**：PS 在 7 档以下切到 **4:2:0**，色度分辨率减半，
+  布料花色和文字会发虚 —— 那是断崖不是渐变。口径写在 `Photoshop.JPEG_QUALITY`。
 - 🔴 **`save … in` 的目标必须是 file specification，不能是 alias。**
   `file path of d` 给的就是 alias，直接喂回去必报 **8800「发生了常规 Photoshop 错误。
   该功能可能无法在这个版本的 Photoshop 中使用」** —— 一句有用的话都没有，1.12.0/1.12.1 卡在这儿。
@@ -182,6 +187,9 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   （2026-08-24 已批）。安全做法：`cp` 一张图到 `/tmp` → `open -b com.adobe.Photoshop` 打开它 →
   **先 `name of current document` 确认最前面的是那个临时文件再动手**，否则会覆盖人正在改的真素材。
   只读的探测直接跑；要试 `save` 就加 `with copying` 存到 `/tmp`。
+  🔴 **别对着 PS 已经打开的那个文件再 `cp` 一次** —— PS 会弹「磁盘拷贝已更改，是否更新？」，
+  那是个模态框，之后所有 AE 全部挂住（实测卡了一轮，得用 System Events 点掉「取消」再收拾）。
+  测完记得把临时文档 `close … saving no`，别给人留一堆标签页。
 - 改 AppleScript 之后**先在 Mac 上 `osacompile` 过一遍**再信它 —— 但注意
   **`osacompile` 只管语法，管不了术语被抢、也管不了参数类型**
   （`POSIX path` 抢词和 alias 当目标这两条，编译全程绿灯，运行才炸）：

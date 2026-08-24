@@ -28,6 +28,27 @@ enum Photoshop {
 
     static let bundleID = MainImages.photoshopBundleID
 
+    /// 存回去的 JPEG 画质（Photoshop 的 0–12 档，不是 libjpeg 的 0–100）。
+    ///
+    /// 🔴 **别用 12。** 12 是面板上的「最佳」，但存回的是一张**本来就压过**的图：
+    ///    2026-08-24 拿真素材（1440×1920）在真 PS 上量过一轮 ——
+    ///
+    ///    | 档 | 体积 | 相对原图 | 抽样 | 亮度量化均值 |
+    ///    |---|---|---|---|---|
+    ///    | 原始下载图 | 732,600 | — | 4:4:4 | 12.7 |
+    ///    | q6 | 353,063 | 48% | **4:2:0** | 13.8 |
+    ///    | q8 | 521,789 | 71% | 4:4:4 | 12.4 |
+    ///    | **q9** | **684,460** | **93%** | 4:4:4 | 10.4 |
+    ///    | q12 | 1,476,300 | **202%** | 4:4:4 | 1.7 |
+    ///
+    ///    q12 把体积翻一倍，多出来的精度大半花在**保留原图自己的压缩痕迹**上；
+    ///    而这些图传上淘宝还要被平台再压一次，等于白花。
+    /// 🔴 **也别往 6 以下降**：PS 在 7 档以下切到 **4:2:0**，色度分辨率减半 ——
+    ///    电商图上的布料花色和文字会明显发虚，这是个断崖，不是渐变。
+    /// 选 9：量化精度比原图略细一点（10.4 vs 12.7），去水印重编码那一道损耗有余量兜着，
+    /// 体积又跟原图基本持平（用户 2026-08-24 定）。
+    private static let JPEG_QUALITY = 9
+
     private enum Format {
         case jpeg, png
 
@@ -44,7 +65,7 @@ enum Photoshop {
         var saveLine: String {
             switch self {
             case .jpeg:
-                return "save d in dest as JPEG with options {class:JPEG save options, quality:12, "
+                return "save d in dest as JPEG with options {class:JPEG save options, quality:\(JPEG_QUALITY), "
                      + "embed color profile:true} appending no extension without copying"
             case .png:
                 return "save d in dest as PNG with options {class:PNG save options, interlaced:false} "
