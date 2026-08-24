@@ -47,6 +47,12 @@ enum Photoshop {
     ///    电商图上的布料花色和文字会明显发虚，这是个断崖，不是渐变。
     /// 选 9：量化精度比原图略细一点（10.4 vs 12.7），去水印重编码那一道损耗有余量兜着，
     /// 体积又跟原图基本持平（用户 2026-08-24 定）。
+    ///
+    /// 【这条路等于 PS 的哪个菜单】等于**「文件 → 存储为 / 存储副本」→ JPEG**，逐项对应
+    /// 那个「JPEG 选项」对话框。**不等于「导出为」/「存储为 Web 所用格式」**：那是另一套引擎，
+    /// 画质刻度 0–100 不是 0–12（实测 q80 反而比这儿的 q9 更细、文件更大），而且会把
+    /// EXIF/XMP/ICC 几乎剥光。这条路会带上约 18.7 KB 元数据（PS 自己写的 EXIF、
+    /// Photoshop 资源块、XMP、sRGB 的 ICC）—— 是「存储为」的固有行为，不是我们加的。
     private static let JPEG_QUALITY = 9
 
     private enum Format {
@@ -65,8 +71,11 @@ enum Photoshop {
         var saveLine: String {
             switch self {
             case .jpeg:
+                // `format options:optimized` = 对话框里的「基线已优化」：优化哈夫曼表，
+                // 量化表一个字节不变（画质零损失），实测同一张图 684,409 → 670,051（省 2.1%）。
+                // 仍是标准基线 JPEG，浏览器和淘宝都吃。不写这一项的话 PS 默认走 standard。
                 return "save d in dest as JPEG with options {class:JPEG save options, quality:\(JPEG_QUALITY), "
-                     + "embed color profile:true} appending no extension without copying"
+                     + "embed color profile:true, format options:optimized} appending no extension without copying"
             case .png:
                 return "save d in dest as PNG with options {class:PNG save options, interlaced:false} "
                      + "appending no extension without copying"
