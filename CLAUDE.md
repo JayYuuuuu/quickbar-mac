@@ -76,6 +76,26 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   因为这件事出问题的地方全在这台机器的本地状态（千牛浏览器开没开、登录过没过期），
   而人就坐在这台机器前面。细节在 AI 电商内容助手仓库的 `docs/rules/油猴脚本.md`。
 
+## `quickbar://` 是给网页用的入口（v1.8.0）
+
+「AI 电商内容助手」的品牌素材变动页上那个「在 Finder 打开」，落点是
+`quickbar://reveal?path=…&dir=…&suffix=…` → `Sources/QuickBar/Core/URLScheme.swift`。
+
+- 🔴 **URL 事件自己装处理器**，不能只靠 `application(_:open:)`：那条走的是 AppKit 装的默认
+  GetURL 处理器，`LSUIElement` 的后台程序上不同系统版本表现不一致。AppDelegate 里两条都接着，
+  `URLScheme.handle` 内有 2 秒去重，撞上也不会开两次访达。
+- 🔴 **这是任何网页都能塞参数的入口**，所以只认 `reveal` 一个动作、只开访达；路径必须落在
+  `/Volumes` 或家目录下（`standardizedFileURL` 折平 `..` 之后再判前缀）。要加动作先想清楚
+  「一个恶意页面拿它能干什么」——别把执行/删除/上传挂上来。
+- 🔴 **三个参数是有分工的**：`path` 首选目标、`dir` 兜底目录、`suffix`（`_<商品ID>`）让本机
+  按后缀在 `dir` 里再找一次。服务端读到的目录名和访达呈现的可能对不上（SMB 的 Unicode
+  归一化就够了），`suffix` 是唯一的自愈路径。
+- 🔴 **绝不「点了没反应」**：目标没了就退到还在的上一层并说清原因；通知没授权就退回弹框
+  （静悄悄地降级 = 人以为打开的是 A、其实是 B）。
+- 服务端那半边：路径由 `api/material-folder.js` 从盘上**读**出来（容器 `/nas/<共享>` ↔
+  Mac `/Volumes/<共享>`，只差一个前缀），不是拼的。改那边先读 AI 电商内容助手仓库的
+  `docs/rules/采集-店铺与详情浏览.md` 与 `api/material-folder.js` 的文件头。
+
 ## 其它
 
 - **本地开发版会被自动更新器换掉**：`./build.sh` 出的是 `0.0.0-dev`，已加护栏（版本含 `dev` 不参与

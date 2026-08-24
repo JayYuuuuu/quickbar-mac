@@ -18,6 +18,21 @@
 	<string>QuickBar</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- 网页上「在 Finder 打开」按钮走这条协议进来（见 Sources/QuickBar/Core/URLScheme.swift）。
+	     只接 reveal：开访达，不执行任何东西。 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.yujiev.quickbar.reveal</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>quickbar</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>__VERSION__</string>
 	<key>CFBundleVersion</key>

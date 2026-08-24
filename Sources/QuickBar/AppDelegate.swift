@@ -52,6 +52,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         Updater.shared.startScheduledChecks()
+
+        // `quickbar://reveal?path=…` —— 网页上「在 Finder 打开」那个按钮的落点（见 URLScheme.swift）。
+        // 🔴 自己装 GetURL 处理器，不只靠 `application(_:open:)`：那个走的是 AppKit 装的默认处理器，
+        //    LSUIElement 的后台程序上不同系统版本表现不一致，装了这个才稳。两条都到 URLScheme.handle，
+        //    真撞上了那边有两秒去重，不会开两次访达。
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
+    @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        guard let raw = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+              let url = URL(string: raw) else { return }
+        URLScheme.handle(url)
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { URLScheme.handle(url) }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
