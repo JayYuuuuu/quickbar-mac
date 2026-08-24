@@ -16,6 +16,10 @@ final class EventTapService {
     var onTrigger: ((CGPoint) -> Void)?
     /// 在文件面板里按了跳转键。
     var onJumpToFinder: (() -> Void)?
+    /// 人敲了键或松开了鼠标。药丸拿它当「访达里的选中项可能变了」的信号 ——
+    /// 见 `MainImagesPill.noteUserInput`。**这里不判断前台是谁**：那要读一次
+    /// `NSWorkspace`，而这个回调是每一次按键都会走的，判断留给主线程那边做。
+    var onUserInput: (() -> Void)?
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -63,6 +67,9 @@ final class EventTapService {
     private func threadMain() {
         let mask = (1 << CGEventType.leftMouseDown.rawValue)
             | (1 << CGEventType.leftMouseUp.rawValue)
+            // 右键只为了「选中项可能变了」这一个信号收进来，不做任何拦截：
+            // 访达里右键点一个文件也会把它选中，漏了这条就只能等 8 秒的兜底轮询。
+            | (1 << CGEventType.rightMouseUp.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue)
 
@@ -96,7 +103,11 @@ final class EventTapService {
 
         switch type {
         case .keyDown:
+            notifyInput()
             return handleKeyDown(event)
+        case .rightMouseUp:
+            notifyInput()
+            return Unmanaged.passUnretained(event)
         case .leftMouseDown:
             if handleMouseDown(event) {
                 swallowNextMouseUp = true
@@ -104,6 +115,7 @@ final class EventTapService {
             }
             return Unmanaged.passUnretained(event)
         case .leftMouseUp:
+            notifyInput()
             if swallowNextMouseUp {
                 swallowNextMouseUp = false
                 return nil
@@ -115,6 +127,12 @@ final class EventTapService {
         default:
             return Unmanaged.passUnretained(event)
         }
+    }
+
+    /// 往主线程扔一个「人动了」。回调里只做一次 `async`，够轻。
+    private func notifyInput() {
+        guard onUserInput != nil else { return }
+        DispatchQueue.main.async { [weak self] in self?.onUserInput?() }
     }
 
     /// 跳转键（默认 ⌘G）。只在确实是文件面板时才吞掉——

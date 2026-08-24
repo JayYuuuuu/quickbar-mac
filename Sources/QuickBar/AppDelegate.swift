@@ -52,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         MainImagesPill.shared.start()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }
+        // 「人动了」→ 药丸才去问访达选中了什么（见 MainImagesPill.noteUserInput）。
+        // 装在这儿而不是 MainImagesPill.start() 里，是因为 tap 的回调应该只有一个主人。
+        EventTapService.shared.onUserInput = { MainImagesPill.shared.noteUserInput() }
         EventTapService.shared.onJumpToFinder = { [weak self] in self?.jumpToFinder() }
 
         if Permissions.allGranted {

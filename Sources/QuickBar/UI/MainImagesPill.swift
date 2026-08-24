@@ -52,6 +52,17 @@ final class MainImagesPill {
     /// 贴着谁走。窗口一动就把药丸挪过去（见 Core/WindowFollow.swift）。
     private let follow = WindowFollow()
 
+    // 访达那头：**有人动了才去问它**（见 `noteUserInput`）
+    /// 上一次输入之后还没查过访达。
+    private var selectionDirty = true
+    private var lastFinderProbe = Date.distantPast
+    private var inputProbe: DispatchWorkItem?
+    /// 兜底轮询间隔。事件 tap 看不到的改选中（脚本、拖放落点、别的应用代为操作）
+    /// 靠它接住；1.5 秒的心跳仍在跑，只是不再每跳都去问访达。
+    private static let finderFallbackPoll: TimeInterval = 8
+    /// 输入之后隔多久去问一次。太短会在连点里问好几遍，太长人就觉得"慢半拍"。
+    private static let inputDebounce: TimeInterval = 0.12
+
     // 进出节奏（设计稿「实现侧 · 进出节奏」那张便签）
     /// 进场前先等一下，等完再确认条件仍成立 —— 心跳 1.5 秒一跳，不等的话
     /// 鼠标扫过一串文件夹就会连闪好几颗。
@@ -139,6 +150,30 @@ final class MainImagesPill {
         hide()
     }
 
+    /// 人敲了键 / 松开了鼠标。
+    ///
+    /// 【为什么用它当触发器】原来是每 1.5 秒无条件问一次访达「选中了什么」——
+    /// 一次 AppleScript 往返约 24ms，**只要访达在最前就一直在花**（实测 1.6% 单核），
+    /// 而且平均要等 0.75 秒才发现选中项变了，加上进场那 400ms，人点完到药丸浮出来要 1.2 秒。
+    /// 两头都不划算。
+    ///
+    /// 访达里的选中项**只可能被点击或按键改变**，而事件 tap 本来就在看这两样。
+    /// 于是改成：**没人动就一发 AE 都不发**；动了就防抖 120ms 之后查一次。
+    /// 空闲开销归零，反应从 1.2 秒缩到约 0.5 秒。
+    ///
+    /// 🔴 **兜底轮询不能去掉**：脚本改选中、拖放落点、别的应用代为操作，tap 都看不到。
+    ///    8 秒一次，是原来的 1/6。
+    /// 🔴 **tap 没在跑时要退回原来的轮询**：人可以在菜单里「暂停触发」，那时候 tap 是关的，
+    ///    只靠 8 秒兜底会让药丸慢得像坏了。
+    func noteUserInput() {
+        guard enabled, mode == .finder else { return }
+        selectionDirty = true
+        inputProbe?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.tick() }
+        inputProbe = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.inputDebounce, execute: work)
+    }
+
     /// 当前该贴着谁。
     private var hostBundleID: String {
         mode == .finder ? "com.apple.finder" : Photoshop.bundleID
@@ -155,7 +190,7 @@ final class MainImagesPill {
         case "com.apple.finder":
             // 从别处回到 Finder：**忘掉上一次的选中项**，否则「选中项没变」那一条
             // 会让药丸再也不出现（去 PS 改完图回来正是这条路）。
-            if mode != .finder { mode = .finder; lastSelection = [] }
+            if mode != .finder { mode = .finder; lastSelection = []; selectionDirty = true }
             tickFinder()
         case Photoshop.bundleID:
             if mode != .photoshop { mode = .photoshop; hide() }
@@ -203,6 +238,15 @@ final class MainImagesPill {
     private func tickFinder() {
         guard finderSideEnabled else { hide(); return }
         guard !probing else { return }
+        // 🔴 **没人动就不问访达**（见 `noteUserInput`）。三种情况才放行：
+        //    有输入 / 兜底间隔到了 / 事件 tap 没在跑（那就退回原来的每跳都问）。
+        let now = Date()
+        let mustPoll = !EventTapService.shared.isRunning
+        if !selectionDirty, !mustPoll, now.timeIntervalSince(lastFinderProbe) < Self.finderFallbackPoll {
+            return
+        }
+        selectionDirty = false
+        lastFinderProbe = now
         // 🔴 **问 Finder 这一发必须在主线程**。第一版为了不占主线程把它扔进了后台队列，
         //    结果是 `NSAppleScript` 一声不响地返回空 —— 药丸从不出现、日志一行都没有
         //    （2026-08-24 实测，白查了一轮）。它不是线程安全的，AE 的权限判定同理。
@@ -323,6 +367,8 @@ final class MainImagesPill {
     private func hide() {
         pendingShow?.cancel()
         pendingShow = nil
+        inputProbe?.cancel()
+        inputProbe = nil
         doneTimer?.invalidate()
         doneTimer = nil
         shownTitle = ""

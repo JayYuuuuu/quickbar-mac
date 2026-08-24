@@ -2,12 +2,17 @@ import AppKit
 
 /// 那颗药丸长什么样。**只管画，不管什么时候出现** —— 那半在 `MainImagesPill`。
 ///
-/// 版式来自设计稿 `QuickBar 快捷条.dc.html` 的 `1d Pill`：
-/// 高 30、圆角 9、1px 边框、12pt medium、左右内边距 13、宽度 120–320 夹取。
+/// 版式来自设计稿 `design/QuickBar 快捷条.dc.html` 的 `1d Pill`：
+/// 高 32、圆角 10、1px 边框、12.5pt semibold、左右内边距 14、间距 7、宽度 120–320 夹取。
 ///
-/// 【为什么不是 NSButton】三个状态要改的东西超出了 `NSButton` 肯给的范围：
-/// 按下时整颗变强调色实底 + 缩到 0.97、悬停时只有边框和文字变色、进行中底边还要有一条流动的线。
-/// 用 `NSButton` 拼这些等于跟它的绘制打架，自绘反而短。
+/// 🔴 **可点态一律「实色强调填充 + 白字 + 前导 5pt 白点」，不用毛玻璃。**
+///    这是拿实拍改出来的结论：玻璃灰底浮在 Photoshop 的深色画布上会**完全糊掉** ——
+///    人眼扫过去只看到一小块比背景稍亮的雾，根本注意不到那儿有个按钮。
+///    **只有不可点的「存回中…」才降成中性玻璃** —— 灰掉本身就是「现在别点」的信号。
+///
+/// 【为什么不是 NSButton】要改的东西超出了它肯给的范围：悬停是整块填充提亮 16%、
+/// 按下是压暗 18% 再缩到 0.97、进行中底边还有一条流动的线。用 `NSButton` 拼这些
+/// 等于跟它的绘制打架，自绘反而短。
 ///
 /// 【三条实测】
 /// 🔴 **`NSTrackingArea` 必须用 `.activeAlways`**：药丸挂在 `.nonactivatingPanel` 上，
@@ -20,38 +25,50 @@ import AppKit
 final class PillView: NSView {
 
     enum Style {
-        /// 可以点。
+        /// 可以点：实色强调填充。
         case action
-        /// 正在干活，不可点（文字降到次要色，底边一条流动的线）。
+        /// 正在干活，不可点：降成中性玻璃 + 底边一条流动的线。
         case busy
-        /// 干完了那 0.6 秒（绿色 + 对勾，随后整颗收走）。
+        /// 干完了那 0.6 秒：绿色实底 + 对勾，随后整颗收走。
         case done
     }
 
-    static let height: CGFloat = 30
-    static let corner: CGFloat = 9
-    static let padH: CGFloat = 13
+    static let height: CGFloat = 32
+    static let corner: CGFloat = 10
+    static let padH: CGFloat = 14
+    static let gap: CGFloat = 7
+    static let dotSize: CGFloat = 5
     static let minWidth: CGFloat = 120
     static let maxWidth: CGFloat = 320
-    static let font = NSFont.systemFont(ofSize: 12, weight: .medium)
+    static let font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
 
     var onClick: (() -> Void)?
 
+    /// 只有「存回中」那一态用得到它 —— 别的时候整块被 `fill` 盖住。
     private let blur = NSVisualEffectView()
-    /// 按下时盖上去的强调色实底。平时透明 —— 毛玻璃在它下面。
-    private let tint = CALayer()
-    private let label = NSTextField(labelWithString: "")
-    private let check = NSImageView()
-    /// 进度：底边一条 1.5pt 的线。设计稿的原话是「底边描边着色，不加进度条控件」。
+    /// 实色填充（强调色 / 绿色）。
+    private let fill = CALayer()
+    /// 悬停提亮 / 按下压暗，盖在 `fill` 上的一层。
+    private let overlay = CALayer()
+    /// 顶部 1px 内高光。设计稿只要这一条立体感，不加别的。
+    private let innerTop = CALayer()
+    /// 前导那颗 5pt 圆点。
+    private let dot = CALayer()
+    /// 进度：底边一条 2pt 的线。设计稿的原话是「底边描边着色，不加进度条控件」。
     private let progress = CALayer()
     /// 进行中：同一条位置上的流动渐变。
     private let flow = CAGradientLayer()
+
+    private let label = NSTextField(labelWithString: "")
+    private let check = NSImageView()
 
     private var style: Style = .action
     private var fraction: CGFloat = 0
     private var hovering = false
     private var pressed = false
     private var tracking: NSTrackingArea?
+    private var labelLeadingDot: NSLayoutConstraint!
+    private var labelLeadingCheck: NSLayoutConstraint!
 
     // MARK: - 组装
 
@@ -62,26 +79,23 @@ final class PillView: NSView {
         layer?.cornerRadius = Self.corner
         layer?.borderWidth = 1
 
-        blur.material = .popover          // 跟随系统明暗；文字用 labelColor 两种外观都清楚
+        blur.material = .popover
         blur.blendingMode = .behindWindow
         blur.state = .active
         blur.translatesAutoresizingMaskIntoConstraints = false
         addSubview(blur)
 
-        tint.backgroundColor = NSColor.controlAccentColor.cgColor
-        tint.opacity = 0
-        layer?.addSublayer(tint)
-
+        for l in [fill, overlay, innerTop, dot, progress, flow] { layer?.addSublayer(l) }
+        dot.cornerRadius = Self.dotSize / 2
+        overlay.opacity = 0
         progress.opacity = 0
-        layer?.addSublayer(progress)
-
+        flow.opacity = 0
         flow.startPoint = CGPoint(x: 0, y: 0.5)
         flow.endPoint = CGPoint(x: 1, y: 0.5)
-        flow.opacity = 0
-        layer?.addSublayer(flow)
 
         check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .bold))
+        check.contentTintColor = .white
         check.isHidden = true
         check.translatesAutoresizingMaskIntoConstraints = false
         addSubview(check)
@@ -93,6 +107,10 @@ final class PillView: NSView {
         label.wantsLayer = true
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
+
+        labelLeadingDot = label.leadingAnchor.constraint(
+            equalTo: leadingAnchor, constant: Self.padH + Self.dotSize + Self.gap)
+        labelLeadingCheck = label.leadingAnchor.constraint(equalTo: check.trailingAnchor, constant: 6)
 
         NSLayoutConstraint.activate([
             blur.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -106,16 +124,9 @@ final class PillView: NSView {
             label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.padH),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
-        // 有对勾时文字往右让 17pt，没有就贴着左内边距。两条约束按需切换。
-        labelLeadingPlain = label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.padH)
-        labelLeadingWithCheck = label.leadingAnchor.constraint(equalTo: check.trailingAnchor, constant: 6)
-        labelLeadingPlain.isActive = true
-
+        labelLeadingDot.isActive = true
         applyColors()
     }
-
-    private var labelLeadingPlain: NSLayoutConstraint!
-    private var labelLeadingWithCheck: NSLayoutConstraint!
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -140,23 +151,25 @@ final class PillView: NSView {
 
         let showCheck = style == .done
         check.isHidden = !showCheck
-        labelLeadingWithCheck.isActive = showCheck
-        labelLeadingPlain.isActive = !showCheck
+        labelLeadingCheck.isActive = showCheck
+        labelLeadingDot.isActive = !showCheck
 
         applyColors()
-        layoutBars()
+        layoutPieces()
         invalidateIntrinsicContentSize()
     }
 
     /// 宽度随文案变，夹在 120…320 之间。
     override var intrinsicContentSize: NSSize {
-        var w = (label.stringValue as NSString)
-            .size(withAttributes: [.font: Self.font]).width + Self.padH * 2
-        if style == .done { w += 17 }
-        return NSSize(width: min(max(ceil(w), Self.minWidth), Self.maxWidth), height: Self.height)
+        let text = (label.stringValue as NSString).size(withAttributes: [.font: Self.font]).width
+        let lead = style == .done ? 12 + 6 : Self.dotSize + Self.gap
+        let w = ceil(text + lead + Self.padH * 2)
+        return NSSize(width: min(max(w, Self.minWidth), Self.maxWidth), height: Self.height)
     }
 
     // MARK: - 外观
+
+    private var accent: NSColor { .controlAccentColor }
 
     private func applyColors() {
         // 🔴 关掉隐式动画：borderColor / backgroundColor 默认有 0.25s 淡入，
@@ -164,46 +177,69 @@ final class PillView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        let accent = NSColor.controlAccentColor
         switch style {
         case .action:
-            layer?.borderColor = (hovering || pressed ? accent : NSColor.separatorColor).cgColor
-            tint.opacity = pressed ? 1 : 0
-            label.textColor = pressed ? .white : (hovering ? accent : .labelColor)
+            fill.backgroundColor = accent.cgColor
+            fill.opacity = 1
+            label.textColor = .white
+            dot.isHidden = false
+            dot.backgroundColor = NSColor.white.withAlphaComponent(pressed ? 0.75 : (hovering ? 1 : 0.8)).cgColor
+            // 悬停提亮 16%、按下压暗 18%（设计稿：**不放大**，放大交给按下那一下）
+            overlay.backgroundColor = (pressed ? NSColor.black.withAlphaComponent(0.18)
+                                               : NSColor.white.withAlphaComponent(0.16)).cgColor
+            overlay.opacity = (pressed || hovering) ? 1 : 0
+            layer?.borderColor = NSColor.black.withAlphaComponent(pressed ? 0.24 : 0.16).cgColor
+            // 按下时把顶部内高光收掉 —— 按下去的东西不该还反光
+            innerTop.backgroundColor = NSColor.white
+                .withAlphaComponent(pressed ? 0 : (hovering ? 0.34 : 0.3)).cgColor
+            progress.backgroundColor = NSColor.white.withAlphaComponent(hovering ? 0.7 : 0.62).cgColor
+
         case .busy:
-            layer?.borderColor = NSColor.separatorColor.cgColor
-            tint.opacity = 0
+            // 降成中性玻璃 = 「现在别点」。灰掉本身就是状态，不用再写一句话。
+            fill.opacity = 0
+            overlay.opacity = 0
             label.textColor = .secondaryLabelColor
-        case .done:
+            dot.isHidden = false
+            dot.backgroundColor = NSColor.tertiaryLabelColor.cgColor
             layer?.borderColor = NSColor.separatorColor.cgColor
-            tint.opacity = 0
-            label.textColor = .systemGreen
-            check.contentTintColor = .systemGreen
+            innerTop.backgroundColor = NSColor.white.withAlphaComponent(0.12).cgColor
+            flow.colors = [NSColor.clear.cgColor, accent.cgColor, NSColor.clear.cgColor]
+
+        case .done:
+            fill.backgroundColor = NSColor.systemGreen.cgColor
+            fill.opacity = 1
+            overlay.opacity = 0
+            label.textColor = .white
+            dot.isHidden = true          // 位置让给对勾
+            layer?.borderColor = NSColor.black.withAlphaComponent(0.16).cgColor
+            innerTop.backgroundColor = NSColor.white.withAlphaComponent(0.26).cgColor
         }
-        tint.backgroundColor = accent.cgColor
-        progress.backgroundColor = accent.withAlphaComponent(0.55).cgColor
-        flow.colors = [NSColor.clear.cgColor, accent.cgColor, NSColor.clear.cgColor]
 
         CATransaction.commit()
     }
 
-    /// 底边那两条线。🔴 宽度必须用 `bounds` 现算（药丸宽度随文案变）。
-    private func layoutBars() {
+    /// 圆点、内高光、底边那两条线。🔴 宽度必须用 `bounds` 现算（药丸宽度随文案变）。
+    private func layoutPieces() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
-        tint.frame = bounds
-        let h: CGFloat = 1.5
+        fill.frame = bounds
+        overlay.frame = bounds
+        innerTop.frame = CGRect(x: 0, y: bounds.maxY - 1, width: bounds.width, height: 1)
+        dot.frame = CGRect(x: Self.padH, y: bounds.midY - Self.dotSize / 2,
+                           width: Self.dotSize, height: Self.dotSize)
+
+        let h: CGFloat = 2
         progress.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: h)
         progress.opacity = (style == .action && fraction > 0.001) ? 1 : 0
         flow.frame = CGRect(x: 0, y: 0, width: bounds.width, height: h)
-        flow.opacity = style == .busy ? 0.6 : 0
+        flow.opacity = style == .busy ? 0.75 : 0
 
         CATransaction.commit()
 
         if style == .busy {
             if flow.animation(forKey: "flow") == nil {
-                // 不用 spinner：设计稿的原话是「靠底边流动描边表达」。
+                // 不用 spinner：设计稿的原话是「靠底边流动描边表达在动」。
                 let a = CABasicAnimation(keyPath: "locations")
                 a.fromValue = [-0.6, -0.3, 0.0]
                 a.toValue = [1.0, 1.3, 1.6]
@@ -218,7 +254,7 @@ final class PillView: NSView {
 
     override func layout() {
         super.layout()
-        layoutBars()
+        layoutPieces()
     }
 
     override func viewDidChangeEffectiveAppearance() {
