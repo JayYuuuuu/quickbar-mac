@@ -46,6 +46,12 @@ final class PillView: NSView {
 
     /// 只有「存回中」那一态用得到它 —— 别的时候整块被 `fill` 盖住。
     private let blur = NSVisualEffectView()
+    /// 🔴 **所有自绘的层都挂在这个视图上，不能直接挂在 `self.layer` 上。**
+    ///    AppKit 会把**子视图的 layer 排到手动 `addSublayer` 的层上面**，
+    ///    于是毛玻璃反过来盖住了实色填充 —— 表现是药丸永远是玻璃灰底配白字，
+    ///    在浅色访达里几乎看不清（1.15.1 实拍翻车）。
+    ///    做成一个排在 `blur` 之后的子视图，顺序就由子视图数组说了算，稳。
+    private let paint = NSView()
     /// 实色填充（强调色 / 绿色）。
     private let fill = CALayer()
     /// 悬停提亮 / 按下压暗，盖在 `fill` 上的一层。
@@ -85,7 +91,10 @@ final class PillView: NSView {
         blur.translatesAutoresizingMaskIntoConstraints = false
         addSubview(blur)
 
-        for l in [fill, overlay, innerTop, dot, progress, flow] { layer?.addSublayer(l) }
+        paint.wantsLayer = true
+        paint.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(paint)                       // 必须排在 blur 之后
+        for l in [fill, overlay, innerTop, dot, progress, flow] { paint.layer?.addSublayer(l) }
         dot.cornerRadius = Self.dotSize / 2
         overlay.opacity = 0
         progress.opacity = 0
@@ -117,6 +126,11 @@ final class PillView: NSView {
             blur.trailingAnchor.constraint(equalTo: trailingAnchor),
             blur.topAnchor.constraint(equalTo: topAnchor),
             blur.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            paint.leadingAnchor.constraint(equalTo: leadingAnchor),
+            paint.trailingAnchor.constraint(equalTo: trailingAnchor),
+            paint.topAnchor.constraint(equalTo: topAnchor),
+            paint.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             check.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.padH),
             check.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -264,6 +278,11 @@ final class PillView: NSView {
     }
 
     // MARK: - 鼠标
+
+    /// 中间那几层（毛玻璃、自绘层、文字）都不该吃鼠标事件 —— 点在药丸任何位置都算点它。
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(convert(point, from: superview)) ? self : nil
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()

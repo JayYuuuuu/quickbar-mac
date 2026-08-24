@@ -155,6 +155,14 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   🔴 **药丸可点态是实色强调填充 + 白字 + 前导白点，不是毛玻璃**（v1.15.0 按实拍改的）：
   玻璃灰底浮在 PS 的深色画布上会完全糊掉，人眼扫过去只看到一小块比背景稍亮的雾。
   **只有不可点的「存回中…」才降成中性玻璃** —— 灰掉本身就是「现在别点」。
+  🔴 **改药丸之后跑 `./Packaging/RenderPill.sh` 离屏渲染核对一遍。**
+  这台机器 **`screencapture` 在 ssh 会话里截不到屏**（报 could not create image from display），
+  而药丸是一颗浮窗，绘制层次排错了从外面一点看不出来 —— 1.15.1 就把实色填充排到了
+  毛玻璃底下，发出去才被实拍打回来。那个脚本把 `PillView` 原样接进一个小程序跑一遍，
+  产物就是它真实的绘制结果（`scp mac24g:'/tmp/pill/*.png' .` 取回来看）。
+  🔴 **自绘的层不能直接 `self.layer?.addSublayer`**：AppKit 会把**子视图的 layer 排到
+  手动加的 sublayer 上面**，于是毛玻璃反过来盖住实色填充。挂在一个排在 `blur` 之后的
+  子视图（`paint`）上，顺序才由子视图数组说了算。
   🔴 `PillView` 里三条实测：`NSTrackingArea` 必须 `.activeAlways`（QuickBar 从来不是活跃应用，
   别的 option 一个鼠标事件都收不到，表现是悬停态永不出现）；进度线宽度要用 `bounds` 现算
   （药丸宽度随中文字数变）；改 layer 颜色要包 `CATransaction.setDisableActions`，
