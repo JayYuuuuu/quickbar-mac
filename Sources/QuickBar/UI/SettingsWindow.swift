@@ -396,6 +396,16 @@ private struct TriggerPane: View {
                         .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                         .help("只在检测到文件面板时才拦截；其他场合这个键仍然是各应用自己的功能。")
                 }
+
+                LabeledContent("在 PS 里存回原位") {
+                    Text(KeySymbols.describe(
+                        flags: CGEventFlags(rawValue: UInt64(store.settings.psSaveBackModifierFlags)),
+                        keyCode: CGKeyCode(store.settings.psSaveBackKeyCode)))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
+                        .help("把 Photoshop 当前那张拼合、按原路径覆盖存回、关掉。只在 Photoshop 在最前时才拦截。开关在「素材批次」那一页。")
+                }
             }
         }
         .formStyle(.grouped)
@@ -457,6 +467,15 @@ private struct PermissionRow: View {
 /// 构建时内置（见 MaterialFeed.builtInKey）。连不通什么全压在底下那一行状态里，
 /// 不在界面上铺说明——真要解释的进 help tip。
 private struct MaterialPane: View {
+
+    /// 「存回原位」那个键长什么样。设置里改不了（跟「跳到 Finder 当前」一样是固定键），
+    /// 但页面上必须写出来 —— 一个按不出来的快捷键等于没有。
+    private var psKey: String {
+        KeySymbols.describe(
+            flags: CGEventFlags(rawValue: UInt64(store.settings.psSaveBackModifierFlags)),
+            keyCode: CGKeyCode(store.settings.psSaveBackKeyCode))
+    }
+
     @ObservedObject var store: Store
     @State private var status = MaterialFeed.shared.statusText
     @State private var age = ""
@@ -503,6 +522,18 @@ private struct MaterialPane: View {
                     set: { store.settings.mainImagesPillEnabled = $0; MainImagesPill.shared.reload() }
                 ))
                 .help("选中之后旁边浮一颗小按钮，点一下那几件的「主图」全部在 Photoshop 里打开（去水印那一步）。只在真的解析出主图时才出现；关掉之后菜单栏那一项照旧能用。")
+
+                Toggle(isOn: Binding(
+                    get: { store.settings.psSaveBackEnabled },
+                    set: { store.settings.psSaveBackEnabled = $0; MainImagesPill.shared.reload() }
+                )) {
+                    HStack(spacing: 6) {
+                        Text("在 PS 里按 \(psKey) 把改完的这张覆盖存回原位")
+                        Text("会覆盖原图")
+                            .font(.caption).bold().foregroundStyle(.orange)
+                    }
+                }
+                .help("Photoshop 当前这张会被拼合，按它自己的原始路径覆盖写回，然后关掉——省掉每张都要在存储对话框里翻回 /Volumes/…/批次/商品/主图/ 那一趟，也就不用再记手上这张是哪件商品的。只认 jpg 和 png；这个键只在 Photoshop 在最前时才拦截。原图会被改完的这版替掉，没有撤销。开着的时候 PS 里还会浮出一颗「存回原位 · 还剩 N 张」。")
             } header: {
                 Text("素材批次")
             } footer: {

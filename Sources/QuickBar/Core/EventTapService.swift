@@ -119,14 +119,27 @@ final class EventTapService {
 
     /// 跳转键（默认 ⌘G）。只在确实是文件面板时才吞掉——
     /// 其他场合 ⌘G 仍然是各 app 自己的「查找下一个」。
+    ///
+    /// 「存回原位」（默认 ⌃⌘S）同理：**只在 Photoshop 在最前时才拦**。
     private func handleKeyDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
         let settings = Store.shared.settings
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags.intersection(TriggerModifier.allFlags)
+
+        // 去水印的收尾：拼合 → 按原路径覆盖存回 → 关掉这张（见 Core/Photoshop.swift）。
+        if settings.psSaveBackEnabled,
+           keyCode == CGKeyCode(settings.psSaveBackKeyCode),
+           flags == CGEventFlags(rawValue: UInt64(settings.psSaveBackModifierFlags))
+               .intersection(TriggerModifier.allFlags),
+           Photoshop.isFrontmost {
+            DispatchQueue.main.async { Photoshop.saveBackFront() }
+            return nil
+        }
+
         guard keyCode == settings.jumpKeyCode else { return Unmanaged.passUnretained(event) }
 
         let wanted = CGEventFlags(rawValue: UInt64(settings.jumpModifierFlags))
-        let actual = event.flags.intersection(TriggerModifier.allFlags)
-        guard actual == wanted.intersection(TriggerModifier.allFlags) else {
+        guard flags == wanted.intersection(TriggerModifier.allFlags) else {
             return Unmanaged.passUnretained(event)
         }
         guard PanelService.shared.currentPanel() != nil else {

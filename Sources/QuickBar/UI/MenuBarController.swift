@@ -16,6 +16,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onJumpToFinder: (() -> Void)?
     var onOpenNewestBatch: (() -> Void)?
     var onMainImagesToPhotoshop: (() -> Void)?
+    var onSaveBackAll: (() -> Void)?
+    var onRevealPhotoshopFront: (() -> Void)?
     var onOpenBatchLinksDir: (() -> Void)?
 
     override init() {
@@ -55,6 +57,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let ps = item("主图丢进 PS", action: #selector(mainImagesToPhotoshop))
             ps.toolTip = "把 Finder 里选中的商品文件夹（或整批）的「主图」全部在 Photoshop 里打开。没选就用当前窗口那个文件夹。"
             menu.addItem(ps)
+        }
+
+        // 改完之后的收尾。**只在 PS 真的在跑时才出现** —— 它俩问的都是「PS 现在开着什么」，
+        // PS 没在跑时点了只会弹一句「没在跑」，那是把实现细节摊给人看。
+        if Store.shared.settings.psSaveBackEnabled, Photoshop.isRunning {
+            let key = KeySymbols.describe(
+                flags: CGEventFlags(rawValue: UInt64(Store.shared.settings.psSaveBackModifierFlags)),
+                keyCode: CGKeyCode(Store.shared.settings.psSaveBackKeyCode))
+            let all = item("全部存回原位", action: #selector(saveBackAll))
+            all.toolTip = "把 PS 里打开的图挨个拼合、按各自的原路径覆盖存回、关掉。"
+                + "只认 jpg 和 png，别的原样留着。一张一张来的话在 PS 里按 \(key)。"
+            menu.addItem(all)
+
+            let reveal = item("PS 当前这张在访达里", action: #selector(revealPhotoshopFront))
+            reveal.toolTip = "打开 Photoshop 最前那个文档所在的素材文件夹，并选中它。"
+            menu.addItem(reveal)
         }
 
         if Store.shared.settings.batchLinksEnabled, Store.shared.settings.materialFeedEnabled {
@@ -118,6 +136,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func jumpToFinder() { onJumpToFinder?() }
     @objc private func openNewestBatch() { onOpenNewestBatch?() }
     @objc private func mainImagesToPhotoshop() { onMainImagesToPhotoshop?() }
+    @objc private func saveBackAll() { onSaveBackAll?() }
+    @objc private func revealPhotoshopFront() { onRevealPhotoshopFront?() }
     @objc private func openBatchLinksDir() { onOpenBatchLinksDir?() }
     @objc private func checkUpdates() { Updater.shared.check(userInitiated: true) }
     @objc private func quit() { NSApp.terminate(nil) }

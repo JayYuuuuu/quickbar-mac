@@ -125,6 +125,33 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
 - 用户面前那台机器是 **mac24g**（浏览器、Finder、PS 都在这台）。另一台 `macmini-i7` 跑采集/runner，
   **有意不装 QuickBar**（用户 2026-08-24 明确说不用），别把「要在人面前发生」的动作推给它。
 
+## 存回原位：改完的图按原路径覆盖写回（v1.11.0）
+
+去水印的后半程。`Core/Photoshop.swift` 是**唯一一处跟 PS 说话的地方**。
+
+- 🔴 **绝不在主线程上发 AE**。Apple Event 是同步等待的，PS 压着任何模态框（存储进度、
+  生成式填充、缺字体）就一直不回复 —— 2026-08-24 实测：终端里问它 `count of documents`，
+  40 秒没回来。所以跑在一条 `Thread` + `CFRunLoopRun()` 的专用线程上。
+- 🔴 **run loop 是那条线程的命根子**。没有 run loop 的 `DispatchQueue` 上 `NSAppleScript`
+  会一声不响返回空（跟 MainImagesPill 那一轮是同一个坑）。为了不把这条赌进去：
+  **每次动作的第一发永远是只读探测**（`infoScript`），撞上「空且无错」就把
+  `mainThreadOnly` 翻成 true，之后全走主线程。只读的重来一次没有代价，写盘的不能赌。
+- 🔴 **20 秒没回话要主动说话，而且要把那条线程扔掉**。AE 是同步的，卡住的那一发会一直占着
+  专用线程，**后面每一发都排在它后面**（2026-08-24 实测：一发卡住，之后两发一个都没跑）。
+  超时兜底除了说话，还必须 `thread = nil` 换一条新的 —— 不然一次卡死之后这功能到重启为止都是哑的。
+- 🔴 **存回去用 `file path of d` 拿到的 alias，不拼路径字符串**。素材盘是 SMB，
+  服务端读到的目录名和访达呈现的可能差一次 Unicode 归一化（URLScheme 那节已经吃过一次）。
+- 🔴 **只认 jpg / png**。覆盖写回意味着原图没了，猜错格式的代价是一张烧进 JPEG 块的 PNG，
+  人不会立刻发现。别的扩展名明说跳过。
+- 🔴 **`saveAllScript` 从最后一个往前数着走**（`repeat with i from (count of documents) to 1 by -1`）：
+  存完就关，关掉 `document i` 之后 1…i-1 下标不动。正着走漏一半；
+  写成 `repeat while (count of documents) > 0` 则会被「跳过但不关」的文档卡成死循环。
+- **药丸的数字不问 PS**（`Photoshop.remaining`）：QuickBar 自己记丢进去几张，
+  每存回一张拿 PS 回的真实 `count of documents` 校准。心跳里发 AE = PS 忙时整条心跳陪着卡。
+- 改 AppleScript 之后**先在 Mac 上 `osacompile` 过一遍**再信它：
+  `python3` 把 `Photoshop.swift` 里的字面量抠出来、替掉插值，`scp` 上去 `osacompile -o /tmp/x.scpt`。
+  PS 的术语只有它自己的 sdef 说了算，Swift 编译器一个字都帮不上。
+
 ## 其它
 
 - **本地开发版会被自动更新器换掉**：`./build.sh` 出的是 `0.0.0-dev`，已加护栏（版本含 `dev` 不参与

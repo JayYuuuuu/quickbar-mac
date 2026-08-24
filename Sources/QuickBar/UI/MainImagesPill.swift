@@ -1,13 +1,21 @@
 import AppKit
 
-/// Finder 里选中商品文件夹时浮出来的那颗小药丸：**点一下，选中那几件的主图全进 Photoshop**。
+/// 去水印那道工序两头的那颗小药丸。同一颗，看你人在哪儿：
+///
+/// · **在 Finder 里**选中了商品文件夹 → 「主图丢进 PS · N 张」，点一下全打开；
+/// · **在 Photoshop 里**还有没存回的图 → 「存回原位 · 还剩 N 张」，点一下把当前这张
+///   拼合、按原路径覆盖存回、关掉（见 Core/Photoshop.swift）。
+///
+/// 【为什么是同一颗】它俩是一件事的两头：丢进去、改完存回来。分成两个浮窗只会让人
+/// 多记一样东西，而这两个状态在时间上根本不重叠 —— 人不可能同时站在 Finder 和 PS 里。
 ///
 /// 【为什么不是菜单栏那一项就够了】菜单栏要「移到屏幕顶上 → 点图标 → 在菜单里找那一项」，
 /// 手离开刚刚选文件的地方跑一趟。选完就在旁边浮一颗按钮，是同一件事少走两步。
 /// 菜单栏那一项保留：浮窗关掉了、或者想对当前窗口整批来一下时还得有个入口。
 ///
-/// 【只在"点了真的有事发生"的时候出现】显示条件不是"在素材目录里"，而是
-/// **选中的东西真的解析出了主图**（`MainImages.collect` 说有几张就是几张）。
+/// 【只在"点了真的有事发生"的时候出现】Finder 那头的显示条件不是"在素材目录里"，而是
+/// **选中的东西真的解析出了主图**（`MainImages.collect` 说有几张就是几张）；
+/// PS 那头是**这一趟确实往里丢过图、还没全存回**（`Photoshop.remaining > 0`）。
 /// 🔴 有意不加"必须在 `_采集` 树下"这种路径闸门：素材被复制到别处照样能用，
 ///    而看不见的显示条件只会变成"它怎么不出来"——那种问题从外面永远查不出。
 ///
@@ -17,7 +25,13 @@ import AppKit
 ///    会让回调晚到，间隔就量歪了。所以轮询整个跑在自己的串行队列上。
 /// 🔴 **只在 Finder 在最前时轮询**，别的时候一个定时器都不留（这软件平时是零负载的）。
 /// 🔴 **选中项没变就什么都不做**：变了才去数图（数图要 readdir，素材盘是 SMB，一次几十毫秒）。
+/// 🔴 **PS 那头一发 AE 都不问**：心跳里绝不去问 Photoshop「你开着几个文档」——
+///    它正压着模态框时那一发要等到它闲下来（实测能等 40 秒以上，见 Photoshop.swift 文件头）。
+///    数字由 QuickBar 自己记（丢进去几张），每存回一张拿 PS 回的真实数校准一次。
 final class MainImagesPill {
+
+    /// 药丸此刻在替哪一头说话。
+    private enum Mode { case finder, photoshop }
 
     static let shared = MainImagesPill()
 
@@ -34,6 +48,9 @@ final class MainImagesPill {
     private var actedSelection: [String] = []
     /// 当前这组选中项对应的主图（点下去就开这些的父级路径）。
     private var pending: [String] = []
+    private var mode: Mode = .finder
+    /// 药丸上现在写着什么。用来判「要不要重画」（见 `show`）。
+    private var shownTitle = ""
 
     private init() {}
 
@@ -46,7 +63,19 @@ final class MainImagesPill {
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            if app?.bundleIdentifier != "com.apple.finder" { self?.leaveFinder() }
+            let front = app?.bundleIdentifier
+            // Finder ↔ PS 之间来回切要立刻换一头（等 1.5 秒会看到上一头的药丸压在新窗口上）；
+            // 切到别的应用一律收掉。
+            if front == "com.apple.finder" || front == Photoshop.bundleID {
+                self?.tick()
+            } else {
+                self?.leave()
+            }
+        }
+        // 存回一张之后数字要立刻变（甚至归零收掉），等下一次心跳会让人以为没生效。
+        Photoshop.onStateChanged = { [weak self] in
+            guard let self, self.mode == .photoshop else { return }
+            self.tick()
         }
         startHeartbeat()
     }
@@ -56,11 +85,18 @@ final class MainImagesPill {
         if enabled { startHeartbeat() } else { stopHeartbeat() }
     }
 
-    private var enabled: Bool {
+    /// 两头都要 PS 装着 —— 一头是往它里面丢，一头是跟它说话。
+    private var finderSideEnabled: Bool {
         Store.shared.settings.mainImagesPillEnabled
             && Permissions.isGranted(.automation)
-            && NSWorkspace.shared.urlForApplication(withBundleIdentifier: MainImages.photoshopBundleID) != nil
+            && Photoshop.isInstalled
     }
+
+    private var photoshopSideEnabled: Bool {
+        Store.shared.settings.psSaveBackEnabled && Photoshop.isInstalled
+    }
+
+    private var enabled: Bool { finderSideEnabled || photoshopSideEnabled }
 
     /// 🔴 **心跳一直在跑，不靠「切到 Finder」那个通知来启动**。
     ///    第一版只在 `didActivateApplication` 里启动轮询 —— 结果是「Finder 本来就在最前面」
@@ -79,12 +115,12 @@ final class MainImagesPill {
     private func stopHeartbeat() {
         timer?.invalidate()
         timer = nil
-        leaveFinder()
+        leave()
     }
 
-    /// 离开 Finder：收掉药丸，并且**忘掉上一次的选中项** —— 不忘的话回到 Finder 时
+    /// 离开：收掉药丸，并且**忘掉上一次的选中项** —— 不忘的话回到 Finder 时
     /// 「选中项没变」这一条会让它不再出现。
-    private func leaveFinder() {
+    private func leave() {
         lastSelection = []
         hide()
     }
@@ -93,10 +129,34 @@ final class MainImagesPill {
 
     private func tick() {
         guard enabled else { stopHeartbeat(); return }
-        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" else {
-            if !lastSelection.isEmpty || panel?.isVisible == true { leaveFinder() }
-            return
+        switch NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
+        case "com.apple.finder":
+            // 从别处回到 Finder：**忘掉上一次的选中项**，否则「选中项没变」那一条
+            // 会让药丸再也不出现（去 PS 改完图回来正是这条路）。
+            if mode != .finder { mode = .finder; lastSelection = [] }
+            tickFinder()
+        case Photoshop.bundleID:
+            if mode != .photoshop { mode = .photoshop; hide() }
+            tickPhotoshop()
+        default:
+            if !lastSelection.isEmpty || panel?.isVisible == true { leave() }
         }
+    }
+
+    /// PS 这头一个字都不问它（见文件头最后一条），只看自己记的账。
+    private func tickPhotoshop() {
+        guard photoshopSideEnabled, Photoshop.remaining > 0 else { hide(); return }
+        show(title: Photoshop.busy ? "存回中…" : "存回原位 · 还剩 \(Photoshop.remaining) 张",
+             tip: "把 Photoshop 当前这张拼合、按它自己的原路径覆盖存回，然后关掉 —— "
+                + "不用再在存储对话框里找那个素材文件夹。快捷键 "
+                + KeySymbols.describe(
+                    flags: CGEventFlags(rawValue: UInt64(Store.shared.settings.psSaveBackModifierFlags)),
+                    keyCode: CGKeyCode(Store.shared.settings.psSaveBackKeyCode))
+                + "。不想要它浮出来：设置 → 素材批次里关掉。")
+    }
+
+    private func tickFinder() {
+        guard finderSideEnabled else { hide(); return }
         guard !probing else { return }
         // 🔴 **问 Finder 这一发必须在主线程**。第一版为了不占主线程把它扔进了后台队列，
         //    结果是 `NSAppleScript` 一声不响地返回空 —— 药丸从不出现、日志一行都没有
@@ -115,19 +175,30 @@ final class MainImagesPill {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.probing = false
+                guard self.mode == .finder else { return }
                 guard !images.isEmpty, paths != acted else { self.hide(); return }
                 self.pending = paths
-                self.show(count: images.count, folders: folders)
+                // 每件只开首图，所以「几张」就是「几件」，不用两个数（folders 留着是为了万一 FIRST_ONLY 关掉）
+                let title = images.count == folders
+                    ? "主图丢进 PS · \(images.count) 张"
+                    : "主图丢进 PS · \(folders) 件 \(images.count) 张"
+                self.show(title: title,
+                          tip: "把选中的商品文件夹里的「主图」全部在 Photoshop 里打开。"
+                             + "不想要它浮出来：设置 → 素材批次里关掉。")
             }
         }
     }
 
     // MARK: - 那颗药丸
 
-    private func show(count: Int, folders: Int) {
-        // 每件只开首图，所以「几张」就是「几件」，不用两个数（`folders` 留着是为了万一 FIRST_ONLY 关掉）
-        let title = count == folders ? "主图丢进 PS · \(count) 张" : "主图丢进 PS · \(folders) 件 \(count) 张"
+    private func show(title: String, tip: String) {
+        // 🔴 PS 那头是**每一跳都会调到这儿**的（数字来自本地记账，不问 PS）。
+        //    文字没变、药丸还在屏幕上，就一个字都别动 —— 否则每 1.5 秒重摆一次窗口、刷一行日志。
+        if title == shownTitle, panel?.isVisible == true { return }
+        shownTitle = title
         let panel = self.panel ?? makePanel()
+        button?.toolTip = tip
+        button?.isEnabled = !(mode == .photoshop && Photoshop.busy)
         // 🔴 borderless 的 NSButton 用 title 时字色不跟 labelColor 走（暗色下会看不清），
         //    所以直接给 attributedTitle 钉住颜色和字体。
         button?.attributedTitle = NSAttributedString(string: title, attributes: [
@@ -187,8 +258,6 @@ final class MainImagesPill {
             b.topAnchor.constraint(equalTo: blur.topAnchor),
             b.bottomAnchor.constraint(equalTo: blur.bottomAnchor),
         ])
-        b.toolTip = "把选中的商品文件夹里的「主图」全部在 Photoshop 里打开。不想要它浮出来：设置 → 素材批次里关掉。"
-
         p.contentView = blur
         panel = p
         button = b
@@ -196,22 +265,35 @@ final class MainImagesPill {
     }
 
     @objc private func act() {
-        let paths = pending
-        actedSelection = paths
-        hide()
-        MainImages.openInPhotoshop(paths)
+        switch mode {
+        case .finder:
+            let paths = pending
+            actedSelection = paths
+            hide()
+            MainImages.openInPhotoshop(paths)
+        case .photoshop:
+            // 不 hide()：存回是有来有回的，药丸要留着显示「存回中…」和剩下几张。
+            Photoshop.saveBackFront()
+        }
     }
 
     // MARK: - 摆哪儿
 
-    /// 贴在 Finder 最前窗口的右下角内侧；拿不到窗口就贴当前屏幕右下。
+    /// 贴在最前那个窗口的下缘内侧；拿不到窗口就贴当前屏幕右下。
+    ///
+    /// Finder 贴**右下角**（列表右边通常是空的）；PS 贴**下缘中间** ——
+    /// 右下角是图层面板，左下角是缩放比例和文档大小，中间那条状态栏才是空的。
+    ///
     /// 🔴 AX 给的坐标是「主屏左上角为原点、y 向下」，AppKit 是「左下为原点、y 向上」，必须翻一次。
     ///    翻错了的表现是药丸跑到屏幕外（看着像"没弹出来"），所以最后一定要夹回可见区域。
     private func place(_ panel: NSPanel) {
         let size = panel.frame.size
         var origin: NSPoint
-        if let rect = finderWindowFrameInAppKit() {
-            origin = NSPoint(x: rect.maxX - size.width - 18, y: rect.minY + 18)
+        let host = mode == .finder ? "com.apple.finder" : Photoshop.bundleID
+        if let rect = frontWindowFrameInAppKit(of: host) {
+            origin = mode == .finder
+                ? NSPoint(x: rect.maxX - size.width - 18, y: rect.minY + 18)
+                : NSPoint(x: rect.midX - size.width / 2, y: rect.minY + 34)
         } else if let screen = NSScreen.main {
             let vf = screen.visibleFrame
             origin = NSPoint(x: vf.maxX - size.width - 24, y: vf.minY + 24)
@@ -227,11 +309,11 @@ final class MainImagesPill {
         panel.setFrameOrigin(origin)
     }
 
-    private func finderWindowFrameInAppKit() -> CGRect? {
+    private func frontWindowFrameInAppKit(of bundleID: String) -> CGRect? {
         guard Permissions.isGranted(.accessibility),
-              let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first
+              let host = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
         else { return nil }
-        let app = AXUIElementCreateApplication(finder.processIdentifier)
+        let app = AXUIElementCreateApplication(host.processIdentifier)
         guard let win = AX.element(app, AXAttr.focusedWindow) ?? AX.elements(app, AXAttr.windows).first,
               let pos = AX.position(win), let sz = AX.size(win), sz.width > 120, sz.height > 80
         else { return nil }

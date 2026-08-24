@@ -34,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         menuBar?.onMainImagesToPhotoshop = {
             MainImages.openInPhotoshop(FinderService.shared.selectionNow())
         }
+        // 去水印的收尾：改完的那张按原路径覆盖存回（见 Core/Photoshop.swift）
+        menuBar?.onSaveBackAll = { Photoshop.saveBackAll() }
+        menuBar?.onRevealPhotoshopFront = { Photoshop.revealFront() }
         menuBar?.onOpenBatchLinksDir = { BatchLinks.revealInFinder() }
 
         FinderService.shared.start()

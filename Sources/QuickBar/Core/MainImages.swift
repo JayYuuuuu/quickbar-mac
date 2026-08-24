@@ -55,8 +55,13 @@ enum MainImages {
         let cfg = NSWorkspace.OpenConfiguration()
         cfg.activates = true
         NSWorkspace.shared.open(images, withApplicationAt: app, configuration: cfg) { _, error in
-            if let error {
-                Notify.tell("Photoshop 没能打开这些图", error.localizedDescription)
+            DispatchQueue.main.async {
+                if let error {
+                    Notify.tell("Photoshop 没能打开这些图", error.localizedDescription)
+                    return
+                }
+                // 丢进去几张，收尾那半边（「存回原位」，见 Core/Photoshop.swift）就知道还剩几张要修。
+                Photoshop.rememberOpened(images.count)
             }
         }
     }

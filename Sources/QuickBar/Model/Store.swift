@@ -140,6 +140,12 @@ struct Settings: Codable {
     var batchLinksEnabled: Bool = true
     /// 在 Finder 里选中商品文件夹时，浮出一颗「主图丢进 PS」。见 UI/MainImagesPill.swift。
     var mainImagesPillEnabled: Bool = true
+    /// 去水印那道工序的收尾：在 PS 里把当前这张按原路径覆盖存回并关掉。见 Core/Photoshop.swift。
+    /// 一个开关同时管快捷键和那颗浮窗 —— 它们是同一件事的两个入口，分成两个只会多一处要解释的地方。
+    var psSaveBackEnabled: Bool = true
+    /// 存回原位的快捷键，默认 ⌃⌘S。**只在 Photoshop 在最前时拦截**，别处照旧是各应用自己的。
+    var psSaveBackKeyCode: UInt16 = 1     // kVK_ANSI_S
+    var psSaveBackModifierFlags: UInt = UInt(CGEventFlags.maskControl.rawValue | CGEventFlags.maskCommand.rawValue)
 
     /// 记住的文件面板尺寸（全局一份）。
     var panelWidth: Double = 0
