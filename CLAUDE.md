@@ -96,7 +96,7 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   Mac `/Volumes/<共享>`，只差一个前缀），不是拼的。改那边先读 AI 电商内容助手仓库的
   `docs/rules/采集-店铺与详情浏览.md` 与 `api/material-folder.js` 的文件头。
 
-## 主图丢进 PS / `~/最近素材批次`（v1.9.0）
+## 主图丢进 PS / `~/最近素材批次`（v1.9.0，浮窗 v1.10.0）
 
 - `MainImages.swift` 是**挑图口径的唯一一处**：单张图 / `主图` 目录 / 商品文件夹 / 批次目录都认。
   🔴 **只往下看一层，不递归** —— 给的要是品牌目录，递归下去就是几千张图，人只会看到 PS 卡死，
@@ -110,6 +110,18 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   而这活儿由网络回调触发 —— 放主线程上就是整个软件转圈。
   🔴 关开关时清目录要放在 MaterialFeed 那个 `guard !batches.isEmpty` **之前**，
   否则批次本来就空时「关掉」这一下什么都不会发生。
+- 🔴 `MainImages.FIRST_ONLY = true`：**每件只开首图**（用户 2026-08-24：「只需要每个主图的第一张，
+  一般都是第一张主图有水印」）。全开是 507 张 / 批。
+- `MainImagesPill.swift`（v1.10.0，选中就浮出来那颗）三条实测教训：
+  🔴 **问 Finder 要选中项不能在后台队列跑** —— `NSAppleScript` 在非主线程上**一声不响地返回空**，
+     表现是药丸从不出现、日志一行没有。主线程一次几十毫秒可以接受（只在 Finder 在最前时）；
+     真正重的那半（数图 = readdir，SMB）才放后台。
+  🔴 **心跳一直跑，别靠 `didActivateApplication` 启动轮询** —— Finder 本来就在最前时（自动更新后
+     重启、开机自启）那个通知永远不来，功能从此静默失效。心跳自己看 `frontmostApplication`，
+     不在 Finder 时只读一个属性就返回。
+  🔴 这台机器上 **`log show` 拿不到 NSLog**（远程排查时别指望它），验证靠临时写 `/tmp` 文件 +
+     `CGWindowListCopyWindowInfo` 看窗口在不在屏幕上（`layer=3` 就是 floating）。
+     屏幕截不到（`screencapture` 在 ssh 会话里报 could not create image from display）。
 - 用户面前那台机器是 **mac24g**（浏览器、Finder、PS 都在这台）。另一台 `macmini-i7` 跑采集/runner，
   **有意不装 QuickBar**（用户 2026-08-24 明确说不用），别把「要在人面前发生」的动作推给它。
 

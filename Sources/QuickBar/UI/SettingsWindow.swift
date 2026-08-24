@@ -497,6 +497,12 @@ private struct MaterialPane: View {
                 ))
                 .disabled(!store.settings.materialFeedEnabled)
                 .help("在家目录建 ~/\(BatchLinks.dirName)/，里面是最近 12 批的替身，跟着服务器自动更新。把这个目录拖进 Finder 侧栏一次，以后点开就是最新那几批。里面只放替身，删掉不影响真素材。")
+
+                Toggle("在 Finder 里选中商品文件夹时浮出「主图丢进 PS」", isOn: Binding(
+                    get: { store.settings.mainImagesPillEnabled },
+                    set: { store.settings.mainImagesPillEnabled = $0; MainImagesPill.shared.reload() }
+                ))
+                .help("选中之后旁边浮一颗小按钮，点一下那几件的「主图」全部在 Photoshop 里打开（去水印那一步）。只在真的解析出主图时才出现；关掉之后菜单栏那一项照旧能用。")
             } header: {
                 Text("素材批次")
             } footer: {

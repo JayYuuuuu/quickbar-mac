@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         MaterialFeed.shared.start()
         PanelService.shared.startWatchingPanelSize()
+        // Finder 里选中商品文件夹 → 旁边浮一颗「主图丢进 PS」（只在 Finder 在前台时才有定时器）
+        MainImagesPill.shared.start()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }
         EventTapService.shared.onJumpToFinder = { [weak self] in self?.jumpToFinder() }

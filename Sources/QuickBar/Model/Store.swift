@@ -138,6 +138,8 @@ struct Settings: Codable {
     /// 在家目录维护一个 `~/最近素材批次/`（里面是最近几批的替身，拖进 Finder 侧栏用）。
     /// 见 Core/BatchLinks.swift。
     var batchLinksEnabled: Bool = true
+    /// 在 Finder 里选中商品文件夹时，浮出一颗「主图丢进 PS」。见 UI/MainImagesPill.swift。
+    var mainImagesPillEnabled: Bool = true
 
     /// 记住的文件面板尺寸（全局一份）。
     var panelWidth: Double = 0

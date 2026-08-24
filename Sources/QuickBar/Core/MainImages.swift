@@ -6,7 +6,8 @@ import AppKit
 /// 【真正花时间的不是修图】原来的流程是：Finder 里翻到批次 → 翻到商品文件夹（一批 60 多个）
 /// → 进 `主图/` → 把图一张张拖进 PS。前面那三跳每件商品都要重来一遍，这个动作就是把它们合成一下。
 ///
-/// 【只认 `主图/`】商品文件夹长这样：`主图/ 主图1比1/ SKU图/ 详情图/ 视频/`。
+/// 【只认 `主图/` 的第一张】商品文件夹长这样：`主图/ 主图1比1/ SKU图/ 详情图/ 视频/`；
+/// 每件只开 `主图/` 里的**首图**（`main_01`）—— 水印一般只烧在第一张上。见 `FIRST_ONLY`。
 /// 🔴 **有意不顺手带上 `主图1比1/`**：那是从店铺列表卡片回填的另一套图，跟着一起开等于每件多开一堆
 ///    标签页，人还得分辨哪张是哪套。哪天确认它也要去水印，在 `SUB_DIRS` 里加一行就行 —— 但那是
 ///    一个**决定**，不该由这个动作偷偷替人做。
@@ -14,6 +15,12 @@ enum MainImages {
 
     /// 要开哪几个子目录里的图。顺序即打开顺序。
     static let SUB_DIRS = ["主图"]
+
+    /// 🔴 **每个商品只开「主图」里的第一张**（`main_01`）—— 水印一般只在首图上
+    ///    （用户 2026-08-24 明确：「只需要每个主图的第一张」）。
+    ///    全开的代价是实打实的：一批 63 件 = 507 张，PS 里 507 个标签页，人得自己认哪张要改。
+    ///    哪天别的位次也要改，把这里改成 false 就恢复全开。
+    static let FIRST_ONLY = true
 
     private static let IMAGE_EXT: Set<String> = ["jpg", "jpeg", "png", "webp", "tif", "tiff", "bmp"]
 
@@ -40,9 +47,8 @@ enum MainImages {
             return
         }
         if images.count > ASK_OVER {
-            let folders = Set(images.map { $0.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent }).count
-            guard Notify.confirm("要一次打开 \(images.count) 张主图吗？",
-                                 "来自 \(folders) 个商品文件夹。Photoshop 会开成 \(images.count) 个标签页，机器可能会卡一会儿。\n"
+            guard Notify.confirm("要一次打开 \(images.count) 张首图吗？",
+                                 "Photoshop 会开成 \(images.count) 个标签页，机器可能会卡一会儿。\n"
                                  + "想少开一点：在 Finder 里只选中要处理的那几个商品文件夹。",
                                  ok: "全部打开") else { return }
         }
@@ -95,9 +101,11 @@ enum MainImages {
 
     private static func images(in dir: URL) -> [URL] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        return names.sorted()
+        let all = names.sorted()
             .map { dir.appendingPathComponent($0) }
             .filter { isImage($0) }
+        // 按文件名排序后的第一张就是 `main_01`（下载器按序号命名，见 listing-source 落盘约定）
+        return FIRST_ONLY ? Array(all.prefix(1)) : all
     }
 
     private static func childDirs(of dir: URL) -> [URL] {
