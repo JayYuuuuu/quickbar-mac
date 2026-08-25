@@ -152,20 +152,27 @@ private struct ItemsPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text("条目").font(.headline)
-                Text("\(store.folders.count) 个文件夹 · \(store.apps.count) 个应用")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .help("快捷条按这个顺序显示，拖动可以排序。")
+            // 设计稿 2a：一行结论（条目总数）+ 右侧一句「怎么排序」，没有别的说明文字。
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("快捷条里的条目 · \(store.items.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .help("\(store.folders.count) 个文件夹 · \(store.apps.count) 个应用。快捷条按这个顺序显示。")
                 if unavailable > 0 {
                     Text("\(unavailable) 项找不到")
-                        .font(.caption).bold().foregroundStyle(.orange)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
                         .help("外置盘没接上时也会这样。QuickBar 只标记不删除，接回去就恢复。")
                 }
                 Spacer()
+                Text("拖动排序")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.tertiary)
+                    .help("拖动行首那个把手就能排序，顺序即快捷条里的顺序。")
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            Divider()
+            .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 9)
 
             List(selection: $selection) {
                 ForEach($store.items) { $item in
@@ -177,33 +184,23 @@ private struct ItemsPane: View {
                 }
                 .onDelete { store.items.remove(atOffsets: $0) }
             }
-            .listStyle(.inset)
+            .listStyle(.bordered)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 20)
             .onDeleteCommand(perform: removeSelected)
 
-            Divider()
-            HStack(spacing: 6) {
-                Menu {
-                    Button("添加文件夹…") { addFolder() }
-                    Button("添加应用…") { addApp() }
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 30, height: 22)
-                .help("添加文件夹或应用")
-
-                Button { removeSelected() } label: {
-                    Image(systemName: "minus").frame(width: 30, height: 22)
-                }
-                .disabled(selection.isEmpty)
-                .help("移除选中的条目")
-
+            // 设计稿 2a：底下是两个写清楚的按钮，不是 ＋/－ 图标 ——
+            // 「＋」要人猜点了会怎样，而这里本来就有地方把话写完。
+            HStack(spacing: 8) {
+                Button("添加文件夹…") { addFolder() }
+                Button("添加应用…") { addApp() }
+                Button("移除") { removeSelected() }
+                    .disabled(selection.isEmpty)
                 Spacer()
                 Text("也可以把文件夹或应用直接拖进来")
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.system(size: 11.5)).foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(.horizontal, 20).padding(.vertical, 14)
         }
         .onAppear { Availability.shared.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .quickBarAvailabilityChanged)) { _ in
@@ -260,9 +257,15 @@ private struct ItemRow: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 10) {
+            // 把手只是「这一行能拖」的提示 —— SwiftUI 的 List 整行都可拖，
+            // 但不给个抓手人根本不会去试（设计稿 2a）。
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .frame(width: 11)
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
-                .resizable().frame(width: 19, height: 19)
+                .resizable().frame(width: 15, height: 15)
 
             if isEditing {
                 TextField("", text: $draft)
@@ -282,41 +285,35 @@ private struct ItemRow: View {
                     .help(item.isRenamed ? "原名：\(item.originalName)" : item.path)
             }
 
-            if let note = Availability.shared.state(of: item).label {
-                Circle().fill(.orange).frame(width: 5, height: 5)
-                Text(note)
-                    .font(.caption).foregroundStyle(.orange)
+            Spacer(minLength: 8)
+
+            // 悬停才出现，平时这一行只有名称和路径（设计稿 2a 的便签）
+            if isHovering, !isEditing {
+                Button("重命名…", action: beginEditing)
+                    .controlSize(.small)
+                    .help("只改快捷条上的显示名，不动文件夹本身")
+                Button("在 Finder 中显示") {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                }
+                .controlSize(.small)
+            } else if isEditing {
+                Text("↩ 确认 · ⎋ 取消")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            } else if let note = Availability.shared.state(of: item).label {
+                badge(note, .orange)
                     .help("QuickBar 只标记不删除——外置盘接回去就自动恢复。")
             } else if item.kind == .app, Actions.isRunning(item) {
-                Circle().fill(.green).frame(width: 5, height: 5)
-                    .help("已在运行")
+                badge("运行中", .green).help("点它会切到前台，不会新开一个。")
+            } else {
+                Text(item.compactPath)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1).truncationMode(.middle)
+                    .help(item.path)
             }
-
-            Spacer()
-
-            // 悬停才出现，平时不占视觉重量
-            if isHovering, !isEditing {
-                Button(action: beginEditing) {
-                    Image(systemName: "pencil")
-                }
-                .buttonStyle(.borderless)
-                .help("重命名——只改快捷条上的显示名，不动文件夹本身")
-
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
-                } label: {
-                    Image(systemName: "arrow.up.forward.app")
-                }
-                .buttonStyle(.borderless)
-                .help("在 Finder 中显示")
-            }
-
-            Text(item.compactPath)
-                .font(.caption).foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.middle)
-                .help(item.path)
         }
-        .padding(.vertical, 2)
+        .frame(height: 26)
         .onHover { isHovering = $0 }
         .contextMenu {
             Button("重命名…", action: beginEditing)
@@ -328,6 +325,15 @@ private struct ItemRow: View {
                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
             }
         }
+    }
+
+    /// 状态徽标：一个词 + 一点底色。比一句话快得多，也不占一整行。
+    private func badge(_ text: String, _ color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 6).padding(.vertical, 3)
+            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
     }
 
     private func beginEditing() {
@@ -369,7 +375,13 @@ private struct TriggerPane: View {
 
                         Spacer()
 
-                        if mode == .modifierDoubleClick {
+                        if mode == .doubleCommand {
+                            Text("默认")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                        } else if mode == .modifierDoubleClick {
                             Picker("", selection: $store.settings.modifier) {
                                 ForEach(TriggerModifier.allCases, id: \.self) { Text($0.label).tag($0) }
                             }
@@ -386,7 +398,7 @@ private struct TriggerPane: View {
                 }
             }
 
-            Section("快捷键") {
+            Section {
                 LabeledContent("跳到 Finder 当前文件夹") {
                     Text(KeySymbols.describe(
                         flags: CGEventFlags(rawValue: UInt64(store.settings.jumpModifierFlags)),
@@ -396,7 +408,6 @@ private struct TriggerPane: View {
                         .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                         .help("只在检测到文件面板时才拦截；其他场合这个键仍然是各应用自己的功能。")
                 }
-
                 LabeledContent("在 PS 里存回原位") {
                     Text(KeySymbols.describe(
                         flags: CGEventFlags(rawValue: UInt64(store.settings.psSaveBackModifierFlags)),
@@ -406,6 +417,12 @@ private struct TriggerPane: View {
                         .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 6))
                         .help("把 Photoshop 当前那张拼合、按原路径覆盖存回、关掉。只在 Photoshop 在最前时才拦截。开关在「素材批次」那一页。")
                 }
+            } header: {
+                Text("快捷键")
+            } footer: {
+                Text("固定，不可修改")
+                    .font(.system(size: 11.5)).foregroundStyle(.tertiary)
+                    .help("这两个键都只在特定场合才拦截（文件面板 / Photoshop 在最前），别处照旧是各应用自己的功能，所以没做成可改的。")
             }
         }
         .formStyle(.grouped)
@@ -414,23 +431,64 @@ private struct TriggerPane: View {
 
 // MARK: - 权限
 
+/// 设计稿 2d：**必需组是实色卡片 + 左侧一条 3pt 状态色条**（三项齐了色条转绿），
+/// **可选组是虚线框、没有色条、字也淡**。形态差异本身就说清了「这一项不一样」，
+/// 不用再写一句「通知是可选的」。
 private struct PermissionsPane: View {
     @Binding var missing: [Permissions.Kind]
 
+    private var missingRequired: Int { missing.filter(\.isRequired).count }
+
     var body: some View {
-        Form {
-            Section {
-                ForEach(Permissions.Kind.allCases) { kind in
-                    PermissionRow(kind: kind, granted: !missing.contains(kind))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 9) {
+                    Circle()
+                        .fill(missingRequired == 0 ? Color.green : Color.orange)
+                        .frame(width: 9, height: 9)
+                    Text(missingRequired == 0 ? "全部就绪" : "还差 \(missingRequired) 项授权")
+                        .font(.system(size: 17, weight: .semibold))
                 }
-            } header: {
-                Text("权限")
-            } footer: {
-                Text(missing.isEmpty ? "都到齐了，功能完整。" : "缺少授权时相关功能会静默降级，不会报错打断你。")
-                    .font(.caption).foregroundStyle(.secondary)
+
+                group(title: "必需 · 缺一项就不能用", kinds: Permissions.Kind.core, required: true)
+                group(title: "可选 · 不影响任何功能",
+                      kinds: Permissions.Kind.allCases.filter { !$0.isRequired }, required: false)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func group(title: String, kinds: [Permissions.Kind], required: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 0) {
+                if required {
+                    // 3pt 状态色条：一眼看出这一组整体到齐没有，不用逐行数
+                    Rectangle()
+                        .fill(missingRequired == 0 ? Color.green : Color.orange)
+                        .frame(width: 3)
+                }
+                VStack(spacing: 0) {
+                    ForEach(Array(kinds.enumerated()), id: \.element) { index, kind in
+                        if index > 0 { Divider() }
+                        PermissionRow(kind: kind, granted: !missing.contains(kind))
+                    }
+                }
+            }
+            .background(required ? AnyShapeStyle(.quaternary.opacity(0.4)) : AnyShapeStyle(.clear),
+                        in: RoundedRectangle(cornerRadius: 9))
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .overlay {
+                RoundedRectangle(cornerRadius: 9)
+                    .strokeBorder(.separator,
+                                  style: required ? StrokeStyle(lineWidth: 0.5)
+                                                  : StrokeStyle(lineWidth: 1, dash: [4, 3]))
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -442,20 +500,31 @@ private struct PermissionRow: View {
     private var missingTint: Color { kind.isRequired ? .orange : .secondary }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(granted ? Color.green : missingTint)
-                .frame(width: 7, height: 7)
+        HStack(spacing: 11) {
+            Image(systemName: kind.symbol)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
             Text(kind.title)
+                .font(.system(size: 13))
+                .foregroundStyle(kind.isRequired ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             Spacer()
+            // 状态用徽标不用句子（这个软件的界面规矩）
             Text(granted ? "已授权" : "未授权")
-                .font(.caption)
-                .foregroundStyle(granted ? AnyShapeStyle(.secondary) : AnyShapeStyle(missingTint))
-                .help(kind.why)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(granted ? Color.green : missingTint)
+                .padding(.horizontal, 7).padding(.vertical, 4)
+                .background((granted ? Color.green : missingTint).opacity(0.15),
+                            in: RoundedRectangle(cornerRadius: 5))
             if !granted {
-                Button("授权") { Permissions.request(kind) }
+                Button("去授权") { Permissions.request(kind) }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
             }
         }
+        .help(kind.why)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 10)
     }
 }
 
@@ -517,6 +586,13 @@ private struct MaterialPane: View {
                 .disabled(!store.settings.materialFeedEnabled)
                 .help("在家目录建 ~/\(BatchLinks.dirName)/，里面是最近 12 批的替身，跟着服务器自动更新。把这个目录拖进 Finder 侧栏一次，以后点开就是最新那几批。里面只放替身，删掉不影响真素材。")
 
+            } header: {
+                Text("素材批次")
+            }
+
+            // 设计稿 2b：去水印那两条单独成节 —— 它们跟上面「把批次放进快捷条」
+            // 不是一回事，混在一张卡里读起来像同一组开关。
+            Section {
                 Toggle("在 Finder 里选中商品文件夹时浮出「主图丢进 PS」", isOn: Binding(
                     get: { store.settings.mainImagesPillEnabled },
                     set: { store.settings.mainImagesPillEnabled = $0; MainImagesPill.shared.reload() }
@@ -527,15 +603,23 @@ private struct MaterialPane: View {
                     get: { store.settings.psSaveBackEnabled },
                     set: { store.settings.psSaveBackEnabled = $0; MainImagesPill.shared.reload() }
                 )) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 7) {
                         Text("在 PS 里按 \(psKey) 把改完的这张覆盖存回原位")
+                        // 🔴 全软件唯一的资损级提示：**一行、橙色、带边框**，原因全进 tip。
+                        //    别再加第二处文字说明（设计稿 2b 的便签）。
                         Text("会覆盖原图")
-                            .font(.caption).bold().foregroundStyle(.orange)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .strokeBorder(Color.orange.opacity(0.55), lineWidth: 1)
+                            }
                     }
                 }
                 .help("Photoshop 当前这张会被拼合，按它自己的原始路径覆盖写回，然后关掉——省掉每张都要在存储对话框里翻回 /Volumes/…/批次/商品/主图/ 那一趟，也就不用再记手上这张是哪件商品的。只认 jpg 和 png；这个键只在 Photoshop 在最前时才拦截。原图会被改完的这版替掉，没有撤销。开着的时候 PS 里还会浮出一颗「存回原位 · 还剩 N 张」。")
             } header: {
-                Text("素材批次")
+                Text("去水印工序")
             } footer: {
                 HStack(spacing: 8) {
                     Button("立即同步") {
@@ -544,8 +628,11 @@ private struct MaterialPane: View {
                     .disabled(!store.settings.materialFeedEnabled)
                     Button("打开那个目录") { BatchLinks.revealInFinder() }
                         .disabled(!store.settings.materialFeedEnabled || !store.settings.batchLinksEnabled)
-                    Text(age.isEmpty ? status : "\(status) · \(age)")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    // 一行结论：通道活着没有、手上有几批。别的都进 tip。
+                    Text(footerStatus)
+                        .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                        .help("同步不成功时这里会写原因；快捷条上那份批次列表照旧用缓存，不会空掉。")
                 }
             }
         }
@@ -554,6 +641,13 @@ private struct MaterialPane: View {
             status = MaterialFeed.shared.statusText
             age = MaterialPane.age(of: MaterialFeed.shared.lastSyncAt)
         }
+    }
+
+    private var footerStatus: String {
+        let count = MaterialFeed.shared.items.count
+        var text = age.isEmpty ? status : "\(status) · \(age)"
+        if count > 0 { text += " · \(count) 个批次" }
+        return text
     }
 
     /// 「多久以前同步的」——比一个绝对时间戳好读，也顺便让人看出通道是不是停了。
@@ -586,7 +680,16 @@ private struct GeneralPane: View {
                 Toggle("记住文件面板尺寸", isOn: $store.settings.rememberPanelSize)
                     .help("普通面板即时套用；Chrome 这类 sheet 面板由系统偏好承载，下次打开生效。")
                 if let size = store.settings.panelSize {
-                    LabeledContent("当前记住的尺寸", value: "\(Int(size.width)) × \(Int(size.height))")
+                    // 设计稿 2e：记住的尺寸旁边给一条出路。没有「忘掉」的话，
+                    // 想回到系统默认只能去翻配置文件 —— 那等于没有退路。
+                    LabeledContent("记住的尺寸") {
+                        HStack(spacing: 8) {
+                            Text("\(Int(size.width)) × \(Int(size.height))")
+                            Button("忘掉") { store.settings.panelSize = nil }
+                                .controlSize(.small)
+                                .help("忘掉之后面板恢复系统默认尺寸；下次你再拉一次就又记住了。")
+                        }
+                    }
                 }
             }
 
@@ -594,9 +697,16 @@ private struct GeneralPane: View {
                 Toggle("新窗口沿用记住的尺寸", isOn: $store.settings.rememberFinderWindowSize)
                     .help("Finder 的尺寸按文件夹逐个记在 .DS_Store 里，新建的目录和网络卷上的目录没有记录，一律开成 960×492。开着就在这种窗口出现时改成你最后拉过的尺寸，别的尺寸不碰。")
                 if let size = store.settings.finderWindowSize {
-                    LabeledContent("当前记住的尺寸", value: "\(Int(size.width)) × \(Int(size.height))")
+                    LabeledContent("记住的尺寸") {
+                        HStack(spacing: 8) {
+                            Text("\(Int(size.width)) × \(Int(size.height))")
+                            Button("忘掉") { store.settings.finderWindowSize = nil }
+                                .controlSize(.small)
+                                .help("忘掉之后新窗口回到 Finder 自己的 960×492；下次你手动拉一次就又记住了。")
+                        }
+                    }
                 } else {
-                    LabeledContent("当前记住的尺寸", value: "还没有")
+                    LabeledContent("记住的尺寸", value: "还没有")
                         .help("手动拉一次 Finder 窗口就记下来了。")
                 }
             }
@@ -606,12 +716,14 @@ private struct GeneralPane: View {
                 Toggle("静默安装，不打断我", isOn: $store.settings.autoUpdateSilently)
                     .disabled(!store.settings.autoUpdate)
                     .help("下载完直接替换并重启。QuickBar 没有窗口，重启对你是无感的。")
-                LabeledContent("当前版本", value: Updater.shared.currentVersion)
-                HStack {
-                    Button("立即检查更新") {
-                        Updater.shared.check(userInitiated: true)
+                LabeledContent("当前版本") {
+                    HStack(spacing: 8) {
+                        Text(Updater.shared.currentVersion)
+                        Button("立即检查更新") { Updater.shared.check(userInitiated: true) }
+                            .controlSize(.small)
+                        Text(updateStatus)
+                            .font(.system(size: 11.5)).foregroundStyle(.secondary)
                     }
-                    Text(updateStatus).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
