@@ -249,6 +249,20 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
   `python3` 把 `Photoshop.swift` 里的字面量抠出来、替掉插值，`scp` 上去 `osacompile -o /tmp/x.scpt`。
   PS 的术语只有它自己的 sdef 说了算，Swift 编译器一个字都帮不上。
 
+## 它在「AI 电商内容助手」的下载页上占一格（v1.16.0）
+
+`https://ai.yujiev.com:8444/desktop-tools#quickbar`，跟端口管理器 / LocalShot / FramePick 并排。
+
+- 🔴 **安装包不放本站，直接指向 GitHub Release 的 `releases/latest/download/QuickBar.zip`**
+  （仓库是公开的，软件自己的静默更新走的也是这条）。所以不需要在生产容器上挂
+  `/downloads/quickbar`，链接永远指向最新版。
+- 🔴 **那页四个软件共处一个 `APPS` 数组，唯一的写入口是
+  `ai-ecommerce/scripts/patch-desktop-tools.sh`**（以生产那份为基准、只改指定 app 的行、
+  自带三方 SHA + 线上回读校验）。自己 sed 整个文件再上传，会把另外三个软件的版本号打回旧值。
+  `release.sh` 发完版已经顺手调它，失败也不影响发版。
+- 页面是**免登录公开页**，所以不能引 `/shared/*`，样式脚本全内联、零外部请求 ——
+  改那页之前先读 AI 电商内容助手仓库 `CLAUDE.md` 的「桌面工具下载页」那节。
+
 ## 其它
 
 - **本地开发版会被自动更新器换掉**：`./build.sh` 出的是 `0.0.0-dev`，已加护栏（版本含 `dev` 不参与

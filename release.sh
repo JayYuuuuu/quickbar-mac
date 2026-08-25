@@ -48,3 +48,21 @@ gh release create "v$VERSION" dist/QuickBar.zip \
   --notes "$BODY"
 
 echo "==> 完成：https://github.com/JayYuuuuu/quickbar-mac/releases/tag/v$VERSION"
+
+# 顺手把「AI 电商内容助手」桌面工具下载页上的版本号和体积更新一下。
+# 页面上那个下载链接指的是 releases/latest/download，永远是最新版，所以这一步
+# 只是让展示的版本号别停在旧值上——**失败不影响发版**，因此整段容错。
+# 🔴 那个页面上四个软件共处一个 APPS 数组，唯一的写入口就是这个脚本
+#    （它以生产那份为基准、只改指定 app 的行，自带校验）。别自己 sed 整个文件再上传，
+#    那会把另外三个软件的版本号打回旧值。
+SITE="${QUICKBAR_SITE_REPO:-/workspace/ai-ecommerce}"
+PATCHER="$SITE/scripts/patch-desktop-tools.sh"
+if [ -x "$PATCHER" ]; then
+  BYTES="$(stat -c %s dist/QuickBar.zip 2>/dev/null || stat -f %z dist/QuickBar.zip)"
+  echo "==> 更新下载页版本号（$VERSION / $BYTES 字节）"
+  ( cd "$SITE" && ./scripts/patch-desktop-tools.sh quickbar \
+      "[{\"os\":\"macOS\",\"version\":\"$VERSION\",\"bytes\":$BYTES}]" ) \
+    || echo "!! 下载页没更新成（发版本身已经成功，稍后手动补：cd $SITE && ./scripts/patch-desktop-tools.sh quickbar …）"
+else
+  echo "!! 没找到 $PATCHER，跳过下载页更新"
+fi
