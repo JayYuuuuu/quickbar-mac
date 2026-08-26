@@ -110,6 +110,14 @@ enum Photoshop {
     private(set) static var total = 0
     private(set) static var busy = false
 
+    /// 上一次 `remaining` 归零，是**存回造成的**，还是别的（人自己把图关了 / 校准发现图没了）。
+    ///
+    /// 🔴 药丸那句绿色的「都存回了」只在前者说。v1.18.0 加了向 PS 校准之后立刻撞上这个：
+    ///    人只是打开一张图、又手动关掉，什么都没存，药丸却先挂着不走、然后弹一句「都存回了」
+    ///    （2026-08-26 用户反馈）。**那是假的成功反馈** —— 告诉人事情办成了，而事情根本没发生过。
+    ///    在只记账的年代这个推断是成立的（归零只可能因为存回），现在不成立了。
+    private(set) static var zeroBySave = false
+
     /// 已经存回几张。
     static var done: Int { max(0, total - remaining) }
     /// 进度（0…1）。没丢过图就是 0，药丸那条线也就不画。
@@ -148,9 +156,19 @@ enum Photoshop {
         syncing = true
         Bridge.run(countScript, readOnly: true, timeout: Bridge.quietTimeout, quiet: true) { text in
             syncing = false
+            // 🔴 **存回开跑了就把这一发的结果丢掉**。发出去的时候还没在存，回来时已经在存了 ——
+            //    这一发拿到的是**存回之前**的快照，用它去覆盖只会把刚减掉的数又抬回来。
+            //    账在存回期间归存回自己管（`report` 拿 PS 关掉文档之后的真实数）。
+            guard !busy else { return }
             guard let n = Int((text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
             // 手动开的图没有「这一批总共几张」可言，进度线得有个分母才画得出来。
             if n > total { total = n }
+            // 校准出来的归零 = 图是被人关掉的 / 本来就没了，不是存回来的。
+            // 🔴 **必须带上 `remaining > 0` 这一半**：存回刚把数减到 0，紧跟着一发迟到的校准
+            //    也会回 0 —— 不加这条它就把 `zeroBySave` 抹成 false，真存回完反而不说
+            //    「都存回了」了（2026-08-26 实测撞到过：日志里只有「存回中…」，没有那句绿的）。
+            //    只有**真的从有变没**才算「图是被关掉的」。
+            if n == 0, remaining > 0 { zeroBySave = false }
             setRemaining(n)
         }
     }
@@ -182,6 +200,7 @@ enum Photoshop {
 
             guard info.count > 0 else {
                 setBusy(false)
+                zeroBySave = false
                 setRemaining(0)
                 Notify.problem("Photoshop 里没有打开的图", "「存回原位」只处理 PS 当前那张。")
                 return
@@ -204,9 +223,12 @@ enum Photoshop {
                 return
             }
             Bridge.run(saveFrontScript(format)) { out in
-                setBusy(false)
-                guard let out else { return }
+                guard let out else { setBusy(false); return }
+                // 🔴 **先更账，再解除忙碌**。反过来的话药丸会在「存回中…」和「都存回了」之间
+                //    闪回一格「存回原位 · 还剩 1 张」—— `setBusy(false)` 那一跳数字还没减呢
+                //    （2026-08-26 从日志里逮到：三行文字挤在同一秒）。
                 report(out, name: info.name, path: info.path)
+                setBusy(false)
             }
         }
     }
@@ -231,6 +253,7 @@ enum Photoshop {
             let num: (Int) -> Int = { Int(lines.count > $0 ? lines[$0].trimmingCharacters(in: .whitespaces) : "") ?? 0 }
             let done = num(0), skipped = num(1), failed = num(2)
             let lastErr = lines.count > 3 ? lines[3] : ""
+            zeroBySave = true
             setRemaining(remaining - done)
             var body = "存回 \(done) 张。"
             if skipped > 0 { body += "跳过 \(skipped) 张（不是 jpg / png，没敢覆盖）。" }
@@ -294,6 +317,9 @@ enum Photoshop {
             return
         }
         // PS 关掉这张之后自己数的，比我们递减准 —— 人中途手动关过几张也能校回来。
+        // 🔴 **在 `setRemaining` 之前设**：它会同步触发 `onStateChanged` → 药丸当场重画，
+        //    晚一行设，药丸看到的就还是上一次的值。
+        zeroBySave = true
         setRemaining(Int(lines.count > 1 ? lines[1].trimmingCharacters(in: .whitespaces) : "") ?? (remaining - 1))
         Notify.log("存回 \(path.isEmpty ? name : path)，PS 里还剩 \(remaining) 张")
     }

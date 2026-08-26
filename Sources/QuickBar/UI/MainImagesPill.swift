@@ -103,13 +103,17 @@ final class MainImagesPill {
     /// 药丸当场淡没，要等下一跳才回来。
     private var hiding = false
 
-    // PS 那头：**问它一次**（见 `Photoshop.syncRemaining`）
+    // PS 那头：**有人动了才去问它**（跟访达那头同一套路数，见 `noteUserInput`）
     private var lastPSSync = Date.distantPast
-    /// 药丸没浮出来时问得勤一点 —— 「在 PS 里开了图药丸不出现」正是这个场景，
-    /// 人是在等它出现。
-    private static let psSyncIdle: TimeInterval = 4
-    /// 药丸已经在屏幕上了，再问只是纠正数字，慢一点没人察觉。
-    private static let psSyncShown: TimeInterval = 15
+    /// 上一次输入之后还没向 PS 校准过。
+    private var psDirty = true
+    /// 人刚动过：两发之间至少隔这么久。**这是画图时的上限** —— PS 里鼠标事件密集，
+    /// 不设下限就成了往 PS 狂发 AE。
+    private static let psSyncAfterInput: TimeInterval = 2
+    /// 没人动时的兜底。药丸没浮出来的时候问得勤一点（人可能正等它出现）。
+    private static let psSyncIdle: TimeInterval = 10
+    /// 药丸已经在屏幕上、又没人动：再问只是纠正数字，慢一点没人察觉。
+    private static let psSyncShown: TimeInterval = 30
 
     private init() {}
 
@@ -200,8 +204,14 @@ final class MainImagesPill {
     /// 🔴 **tap 没在跑时要退回原来的轮询**：人可以在菜单里「暂停触发」，那时候 tap 是关的，
     ///    只靠 8 秒兜底会让药丸慢得像坏了。
     func noteUserInput() {
-        guard enabled, mode == .finder else { return }
-        selectionDirty = true
+        guard enabled else { return }
+        // PS 那头同理：文档数**只可能被人的操作改变**（⌘W 关掉、⌘O 打开、点菜单里的最近文件）。
+        // 没人动就别去问它，动了就尽快问一次 —— 原来纯靠 15 秒兜底，人手动关掉图之后
+        // 药丸还要在那儿挂十几秒（2026-08-26 用户反馈）。
+        switch mode {
+        case .finder: selectionDirty = true
+        case .photoshop: psDirty = true
+        }
         inputProbe?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.tick() }
         inputProbe = work
@@ -238,6 +248,7 @@ final class MainImagesPill {
                 mode = .photoshop
                 hide()
                 // 刚切过来：账多半是过期的（人可能在 PS 里自己开了图、或者关掉了几张）。
+                psDirty = false
                 syncPhotoshop()
             }
             tickPhotoshop()
@@ -251,14 +262,23 @@ final class MainImagesPill {
         guard photoshopSideEnabled else { hide(); return }
         // 🔴 **兜底校准不能省**：人在 PS 里自己开图（历史记录 / 双击 / 拖进去）时 PS 早就是
         //    最前台了，激活通知永远不会来 —— 只靠激活那一次校准，药丸还是不出现。
-        let gap = Photoshop.remaining == 0 ? Self.psSyncIdle : Self.psSyncShown
-        if Date().timeIntervalSince(lastPSSync) > gap { syncPhotoshop() }
+        //    有人动过就走 2 秒那档（关图/开图都是人按出来的），没人动才用长兜底。
+        let gap = psDirty
+            ? Self.psSyncAfterInput
+            : (Photoshop.remaining == 0 ? Self.psSyncIdle : Self.psSyncShown)
+        if Date().timeIntervalSince(lastPSSync) > gap {
+            psDirty = false
+            syncPhotoshop()
+        }
         let left = Photoshop.remaining
 
         // 最后一张存完的那一下：先说一句「都存回了」，停 0.6 秒再收 ——
         // 直接消失的话人不知道刚才那一下到底成没成。
         if left == 0 {
-            if lastRemaining > 0, panel?.isVisible == true, doneTimer == nil {
+            // 🔴 **`Photoshop.zeroBySave` 这一条不能省**：人只是打开一张图又手动关掉时
+            //    `remaining` 一样会归零，少了它药丸会弹一句绿色的「都存回了」——
+            //    什么都没发生却报成功（2026-08-26 用户反馈）。归零就直接收掉，别说话。
+            if lastRemaining > 0, Photoshop.zeroBySave, panel?.isVisible == true, doneTimer == nil {
                 lastRemaining = 0
                 show(title: "都存回了", style: .done, fraction: 1,
                      tip: "这一批的主图都按原路径存回去了。")
@@ -269,6 +289,7 @@ final class MainImagesPill {
                 }
                 return
             }
+            lastRemaining = 0
             if doneTimer == nil { hide() }
             return
         }
@@ -371,6 +392,10 @@ final class MainImagesPill {
         if visible {
             // 已经在屏幕上：只换内容，不重播进场（数字每存回一张就减一，重播会闪）。
             paint(title: title, style: style, fraction: fraction, tip: tip, animateText: true)
+            // 🔴 **这一行不能省**：`reveal` 只在药丸「从无到有」时记日志，于是药丸**已经浮着**
+            //    的时候换的每一句话（「存回中…」「都存回了」）在日志里一个字都没有 ——
+            //    远程排查时会看成「它没显示」，2026-08-26 为此白查了三轮。
+            Notify.log("药丸→ \(title)")
             return
         }
 
