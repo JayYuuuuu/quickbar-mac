@@ -59,6 +59,12 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
 以后加键不用管。但 **`QuickItem` 还是裸的**：给它加字段只能加 Optional 的，
 否则老 `items.json` 解不开会被换成一套默认条目。
 
+🔴 **反过来那一半：界面上写着「固定，不可修改」的键，改默认值对老用户一个都不生效。**
+merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 里躺着的旧快捷键永远赢。
+1.17.0 把存回原位从 ⌃⌘S 换成 F15 时撞上这个：新装的机器是 F15、老机器还是 ⌃⌘S，
+同一个版本两种行为，而且**界面上根本没有能改回来的地方**。
+现在 `Settings.fixedKeys` 列着这几个键，`decodeSettings` 跳过它们 —— 以后再改这类默认值不用管。
+
 ## 素材批次那一行还带「传没传进图片空间」（v1.7.0）
 
 `MaterialFeed` 除了 `/api/listing-source/history`，还顺手拉一次
@@ -180,6 +186,21 @@ ssh mac24g 'cd ~/quickbar-mac && ./build.sh'
 
 去水印的后半程。`Core/Photoshop.swift` 是**唯一一处跟 PS 说话的地方**。
 
+- **默认键是 F15，不是 ⌃⌘S**（1.17.0 换的）。改图时另一只手就搭在键盘右上角，单键按得到；
+  组合键要两只手，而这是「改完一张按一下」的高频重复。
+  🔴 **F13/F14 不能用，F15 可以** —— 实测 `defaults read com.apple.symbolichotkeys`：
+  F13(105) 有两条启用的系统绑定、F14(107) 有三条，**F15(113) 只被一条引用且 `enabled = 0`**
+  （那是老苹果键盘的「调高亮度」，默认关着）。这排里只有它是干净的。
+  🔴 **F13–F20 的键码不连号**：105 / 107 / 113 / 106 / 64 / 79 / 80 / 90（F13…F20，
+  出处是 SDK 的 `HIToolbox.framework/Headers/Events.h`），别按 F13+n 推。
+  `KeySymbols.name` 里补齐了这几条，缺了设置页和药丸的 tip 会显示成「?」。
+  🔴 **只有带数字键盘的全尺寸苹果键盘有这排实体键**。笔记本内置键盘没有，也没有 fn 组合能凑，
+  那种机器得 `hidutil` 把别的键映射过去（映射不过重启，要常驻得挂 LaunchAgent）。
+  用户这台 mac24g 是 Magic Keyboard with Touch ID and Numeric Keypad，有。
+- **不用手按也能验**：`osascript -e 'tell application "System Events" to key code 113'`
+  发出来的合成事件照样穿过 session tap，QuickBar 拦得到（2026-08-26 实测）。
+  🔴 **测之前先 `open -b com.adobe.Photoshop /tmp/<临时图>` 把一张临时图顶到最前**，
+  存回原位作用于 `current document` —— PS 里通常还开着人家真在改的素材。
 - 🔴 **绝不在主线程上发 AE**。Apple Event 是同步等待的，PS 压着任何模态框（存储进度、
   生成式填充、缺字体）就一直不回复 —— 2026-08-24 实测：终端里问它 `count of documents`，
   40 秒没回来。所以跑在一条 `Thread` + `CFRunLoopRun()` 的专用线程上。

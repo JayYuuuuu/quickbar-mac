@@ -143,9 +143,22 @@ struct Settings: Codable {
     /// 去水印那道工序的收尾：在 PS 里把当前这张按原路径覆盖存回并关掉。见 Core/Photoshop.swift。
     /// 一个开关同时管快捷键和那颗浮窗 —— 它们是同一件事的两个入口，分成两个只会多一处要解释的地方。
     var psSaveBackEnabled: Bool = true
-    /// 存回原位的快捷键，默认 ⌃⌘S。**只在 Photoshop 在最前时拦截**，别处照旧是各应用自己的。
-    var psSaveBackKeyCode: UInt16 = 1     // kVK_ANSI_S
-    var psSaveBackModifierFlags: UInt = UInt(CGEventFlags.maskControl.rawValue | CGEventFlags.maskCommand.rawValue)
+    /// 存回原位的快捷键，默认 **F15**（无修饰键）。**只在 Photoshop 在最前时拦截**，别处照旧是各应用自己的。
+    ///
+    /// 用 F15 而不是 ⌃⌘S：这只手正按着数位板/鼠标，另一只手够得到的是键盘右上角那排。
+    /// F13–F19 在系统和 PS 里都没有默认动作，单键无修饰也能拦——组合键要两只手，
+    /// 而这个动作是「改完一张按一下」的高频重复。
+    /// 🔴 只有**带数字键盘的全尺寸苹果键盘**有这排实体键；笔记本内置键盘没有，也没有 fn 组合能凑，
+    /// 那种机器得用 hidutil / Karabiner 把别的键映射成 F15（见 CLAUDE.md）。
+    var psSaveBackKeyCode: UInt16 = 113   // kVK_F15 = 0x71
+    var psSaveBackModifierFlags: UInt = 0
+
+    /// 设置界面上标着「固定，不可修改」的那几个键。**解设置时忽略磁盘上的值**，
+    /// 永远用这里的默认值——否则改默认快捷键只对新用户生效。见 `Store.decodeSettings`。
+    static let fixedKeys: Set<String> = [
+        "jumpKeyCode", "jumpModifierFlags",
+        "psSaveBackKeyCode", "psSaveBackModifierFlags",
+    ]
 
     /// 记住的文件面板尺寸（全局一份）。
     var panelWidth: Double = 0
@@ -219,6 +232,11 @@ final class Store: ObservableObject {
     ///
     /// （条目那边同理——给 `QuickItem` 加字段只能加 Optional 的，否则老 `items.json`
     /// 解不开会被换成一套默认条目。）
+    ///
+    /// 🔴 反过来还有一条：**界面上写着「固定，不可修改」的键，磁盘那份要丢掉**。
+    /// 它们只是历史残留——1.16.0 之前存回原位是 ⌃⌘S，老 `settings.json` 里就躺着 `1`/`1310720`，
+    /// 改了源码里的默认值对**所有老用户一个都不生效**（新装的机器才是新键，同一个版本两种行为，
+    /// 而且没有任何界面能改回来）。见 `Settings.fixedKeys`。
     private static func decodeSettings(_ data: Data) -> Settings? {
         let dec = JSONDecoder()
         guard let onDisk = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -226,7 +244,7 @@ final class Store: ObservableObject {
               var merged = (try? JSONSerialization.jsonObject(with: encoded)) as? [String: Any]
         else { return try? dec.decode(Settings.self, from: data) }
 
-        for (key, value) in onDisk { merged[key] = value }
+        for (key, value) in onDisk where !Settings.fixedKeys.contains(key) { merged[key] = value }
         guard let patched = try? JSONSerialization.data(withJSONObject: merged) else { return nil }
         return try? dec.decode(Settings.self, from: patched)
     }

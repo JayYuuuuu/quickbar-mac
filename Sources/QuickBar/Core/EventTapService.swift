@@ -138,7 +138,7 @@ final class EventTapService {
     /// 跳转键（默认 ⌘G）。只在确实是文件面板时才吞掉——
     /// 其他场合 ⌘G 仍然是各 app 自己的「查找下一个」。
     ///
-    /// 「存回原位」（默认 ⌃⌘S）同理：**只在 Photoshop 在最前时才拦**。
+    /// 「存回原位」（默认 F15，无修饰键）同理：**只在 Photoshop 在最前时才拦**。
     private func handleKeyDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
         let settings = Store.shared.settings
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
