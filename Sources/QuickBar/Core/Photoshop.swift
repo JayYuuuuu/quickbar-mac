@@ -93,11 +93,17 @@ enum Photoshop {
 
     // MARK: - 还剩几张
 
-    /// 这一趟丢进 PS 的图还剩几张没存回。药丸靠它决定出不出现、写几。
+    /// PS 里现在有几张**能存回**的图（有原始路径、jpg/png）。药丸靠它决定出不出现、写几。
     ///
-    /// 🔴 **不轮询 PS**：QuickBar 自己就知道刚丢进去几张，之后每存回一张，拿 PS 回的
-    ///    真实 `count of documents` 校准一次。人手动关掉几张会让它偏大，下一次存回就纠正回来 ——
-    ///    比每 1.5 秒往 PS 发一发 AE 划算得多（PS 正忙时那一发要等到它闲下来，见文件头）。
+    /// 🔴 **只记账是不够的**（2026-08-26 修）：账只在「经药丸丢进去」和「存回一张之后」变，
+    ///    人自己在 PS 里开图（历史记录 / 双击 / 拖进去）或关图，QuickBar 一概不知道。
+    ///    表现就是**看起来很随机**：手动开的图药丸不出现，手动关掉的图药丸还在数它 ——
+    ///    用户实测拍到过「PS 里只开着 1 张，药丸写着还剩 2 张」，日志里那个数从上一次存回
+    ///    之后 19 分钟纹丝不动。药丸出不出现取决于「这张图是怎么进 PS 的」，而人根本不会去想这件事。
+    /// 🔴 **但也不能放进心跳**：AE 是同步的，PS 压着模态框时那一发要等到它闲下来
+    ///    （实测 40 秒以上），而且会把人随后按的 F15 堵在同一条专用线程后面。
+    ///    所以校准是**按需的**：PS 刚到最前时一次 + 在 PS 里时低频兜底一次，
+    ///    3 秒超时、超时静默放弃（见 `syncRemaining`）。
     private(set) static var remaining = 0
     /// 这一趟总共丢进去几张。药丸底边那条进度线要它（设计稿：`已存回 done / total`）。
     /// 归零时一起清掉 —— 下一趟是新的一批，进度不该从上一批接着算。
@@ -129,6 +135,27 @@ enum Photoshop {
         total += count
         setRemaining(remaining + count)
     }
+
+    /// 问一次 PS「你现在开着几张能存回的图」，用真实答案覆盖记的账。
+    ///
+    /// 🔴 **数的是「能存回的」，不是 `count of documents`**：psd / tif / 新建没存过的
+    ///    都不该算进药丸那个数 —— 它写着「还剩 N 张」，人按 N 下期望清空，多出来的那几张
+    ///    每按一次都会弹一句「这张不敢替你覆盖」，等于把错误的承诺兑现成一串报错。
+    /// 🔴 **正在存回时不问**：那一发会排在存回后面，而且存回自己会校准。
+    /// 🔴 **静默**：没人在等这一发，超时就当没问过（`quiet: true`），绝不弹框。
+    static func syncRemaining() {
+        guard isRunning, !busy, !syncing else { return }
+        syncing = true
+        Bridge.run(countScript, readOnly: true, timeout: Bridge.quietTimeout, quiet: true) { text in
+            syncing = false
+            guard let n = Int((text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+            // 手动开的图没有「这一批总共几张」可言，进度线得有个分母才画得出来。
+            if n > total { total = n }
+            setRemaining(n)
+        }
+    }
+
+    private static var syncing = false
 
     private static func setRemaining(_ n: Int) {
         let v = max(0, n)
@@ -308,6 +335,35 @@ enum Photoshop {
     end toFile
     """
 
+    /// 数 PS 里有几张**能存回**的图：有 `file path`（是从文件打开的）且扩展名是 jpg / png。
+    /// `syncRemaining` 用它把药丸那个数校准回真实情况。
+    ///
+    /// 🔴 **`file path` 对没存过的文档是报错，不是返回 missing value**，所以必须 `try` 包住。
+    /// 🔴 **只读、不关文档，所以正着数就行** —— 跟 `saveAllScript` 那条倒着走的规矩不一样，
+    ///    那条是因为存完就关、下标会塌。
+    /// 🔴 **别在这儿用 `POSIX path`**：`path` 这个词在 PS 的 `tell` 块里被它的 Path Suite 抢走
+    ///    （见 `infoScript`）。认扩展名用 `name of d` 就够了。
+    private static let countScript = """
+    set n to 0
+    tell application id "\(bundleID)"
+        repeat with i from 1 to (count of documents)
+            set d to document i
+            set ok to false
+            try
+                if (file path of d) is not missing value then set ok to true
+            end try
+            if ok then
+                set nm to name of d
+                if nm ends with ".jpg" or nm ends with ".JPG" or nm ends with ".jpeg" ¬
+                    or nm ends with ".JPEG" or nm ends with ".png" or nm ends with ".PNG" then
+                    set n to n + 1
+                end if
+            end if
+        end repeat
+    end tell
+    return n as text
+    """
+
     /// 只读探测：打开了几个文档、最前那个叫什么、有没有原始路径、路径是什么、失败的话为什么。
     /// 每次动作的第一发都是它（见文件头第二条）。
     ///
@@ -432,8 +488,17 @@ extension Photoshop {
         private static var thread: Thread?
         private static let runner = Runner()
 
+        /// 后台校准那一发用的超时。它没人在等，卡住了就当没问过 —— 但**不能等 20 秒**：
+        /// 那条专用线程是串行的，卡住的一发会把人随后按的 F15 一起堵在后面。
+        static let quietTimeout: TimeInterval = 3
+
         /// - Parameter readOnly: 这段脚本改不改东西。只有只读的才允许在「空且无错」时重来一次。
-        static func run(_ source: String, readOnly: Bool = false, _ done: @escaping (String?) -> Void) {
+        /// - Parameter timeout: 多久没回话就放弃。默认 20 秒（人按下去等着的那种）。
+        /// - Parameter quiet: 超时不弹框，只记一行日志。**只有没人在等的后台探测才配 true** ——
+        ///   人按了键的动作一律要说话，否则就是「按了没反应」。
+        static func run(_ source: String, readOnly: Bool = false,
+                        timeout: TimeInterval = Bridge.timeout, quiet: Bool = false,
+                        _ done: @escaping (String?) -> Void) {
             var settled = false
             let settle: (String?) -> Void = { text in
                 guard !settled else { return }
@@ -449,9 +514,13 @@ extension Photoshop {
                 //    所以把它丢掉换一条新的 —— 不然一次卡死之后这个功能到重启为止都是哑的。
                 //    旧线程等 PS 回话之后会自己空转下去，`settled` 已经是 true，结果会被丢弃。
                 thread = nil
-                Notify.problem("Photoshop 一直没回话",
-                            "它多半正压着一个对话框（存储进度、生成式填充、缺字体提示…），"
-                            + "也可能是第一次用、屏幕上正等你点「允许」。\n处理掉那个框再按一次。")
+                if quiet {
+                    Notify.log("PS 校准超时（\(Int(timeout))s），这一发放弃")
+                } else {
+                    Notify.problem("Photoshop 一直没回话",
+                                "它多半正压着一个对话框（存储进度、生成式填充、缺字体提示…），"
+                                + "也可能是第一次用、屏幕上正等你点「允许」。\n处理掉那个框再按一次。")
+                }
                 done(nil)
             }
 

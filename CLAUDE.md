@@ -247,8 +247,30 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
 - 🔴 **`saveAllScript` 从最后一个往前数着走**（`repeat with i from (count of documents) to 1 by -1`）：
   存完就关，关掉 `document i` 之后 1…i-1 下标不动。正着走漏一半；
   写成 `repeat while (count of documents) > 0` 则会被「跳过但不关」的文档卡成死循环。
-- **药丸的数字不问 PS**（`Photoshop.remaining`）：QuickBar 自己记丢进去几张，
-  每存回一张拿 PS 回的真实 `count of documents` 校准。心跳里发 AE = PS 忙时整条心跳陪着卡。
+- 🔴 **药丸的数字只记账是错的**（v1.18.0 修）。原来 `Photoshop.remaining` 只在两处变：
+  经药丸丢图进 PS（`MainImages.swift:68` 是**唯一**的 `rememberOpened` 调用点）、以及存回一张之后
+  拿 PS 回的数校准。**人自己在 PS 里开图 / 关图，QuickBar 一概不知道** —— 于是
+  「打开了图药丸不出现」「PS 里只开着 1 张、药丸写着还剩 2 张」（2026-08-26 用户拍到），
+  日志里那个数从上一次存回之后 19 分钟纹丝不动。
+  人只会觉得**它很随机** —— 因为真正的条件是「这张图是怎么进 PS 的」，而没人会想到这一层。
+  现在 `Photoshop.syncRemaining()` 向 PS 要真实数，`MainImagesPill` 在**切到 PS 时**调一次、
+  在 PS 里时**低频兜底**（没药丸 4 秒、有药丸 15 秒）。
+  🔴 **兜底那条不能省**：人在 PS 里开图时 PS 早就是最前台了，激活通知永远不会来。
+  🔴 **仍然绝不放进心跳**，而且这一发是 `quiet: true` + 3 秒超时（`Bridge.quietTimeout`）：
+  没人在等它，卡住就当没问过；20 秒的默认超时会把人随后按的 F15 堵在同一条专用线程后面。
+  `busy` 时直接跳过 —— 存回自己会校准。
+  🔴 **数的是「能存回的」，不是 `count of documents`**：`countScript` 要求拿得到 `file path`
+  且扩展名是 jpg/png。2026-08-26 实测「1 张 jpg + 1 个新建未存文档」→ 它数 1，
+  `count of documents` 是 2。药丸写「还剩 N 张」，人按 N 下就该清空；把 psd / 新建的算进去，
+  多出来的每按一次都弹一句「这张不敢替你覆盖」。
+  （`file path of d` 对没存过的文档是**报错**不是返回 missing value，所以脚本里必须 `try` 包住。）
+- 🔴 **淡出那 0.14 秒里 `panel.isVisible` 还是 `true`**（同版本修）。撞上来的 `show()`
+  会走「已经在屏幕上，只换文字」那条分支 —— 文字换了、alpha 还在往 0 走，药丸当场淡没，
+  要等下一跳才回来。`MainImagesPill.hiding` 单独记一笔，`reveal` 里清掉就是「半路杀回来」。
+- **远程验药丸在不在屏幕上**：`screencapture` 在 ssh 会话里截不到，用 CGWindowList ——
+  `swiftc` 一个五行程序过滤 `kCGWindowOwnerName == "QuickBar"`，`layer=3` 就是浮窗，
+  还能读到 alpha 和 bounds（2026-08-26 用它确认了「手动开图→药丸出现」「手动关图→药丸收掉」）。
+  🔴 **别用 python3 调 Quartz**，这台机器的系统 python3 没有 pyobjc（`ModuleNotFoundError`）。
 - 🔴 **动作失败一律 `Notify.problem`（弹框），不能用 `Notify.tell`（通知）。**
   专注模式 / 「通知样式：无」会把横幅**整条吞掉**：2026-08-24 实测，「存回原位」连点三次、
   三条通知全部投递成功（日志里 `Added notification request … hasError: 0`），人一条都没看见，

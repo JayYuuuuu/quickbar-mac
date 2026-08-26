@@ -14,7 +14,8 @@ import AppKit
 ///
 /// 【只在"点了真的有事发生"的时候出现】Finder 那头的显示条件不是"在素材目录里"，而是
 /// **选中的东西真的解析出了主图**（`MainImages.collect` 说有几张就是几张）；
-/// PS 那头是**这一趟确实往里丢过图、还没全存回**（`Photoshop.remaining > 0`）。
+/// PS 那头是**PS 里现在有能存回的图**（`Photoshop.remaining > 0`，向 PS 校准过的真实数，
+/// 不管这张图是经药丸丢进去的还是人自己打开的）。
 /// 🔴 有意不加"必须在 `_采集` 树下"这种路径闸门：素材被复制到别处照样能用，
 ///    而看不见的显示条件只会变成"它怎么不出来"——那种问题从外面永远查不出。
 ///
@@ -23,9 +24,11 @@ import AppKit
 ///    **一声不响地返回空** —— 药丸从不出现、日志一行没有（2026-08-24 实测，白查了一轮）。
 /// 🔴 **只在宿主应用在最前时轮询**，别的时候一个定时器都不留（这软件平时是零负载的）。
 /// 🔴 **选中项没变就什么都不做**：变了才去数图（数图要 readdir，素材盘是 SMB，一次几十毫秒）。
-/// 🔴 **PS 那头一发 AE 都不问**：心跳里绝不去问 Photoshop「你开着几个文档」——
-///    它正压着模态框时那一发要等到它闲下来（实测能等 40 秒以上，见 Photoshop.swift 文件头）。
-///    数字由 QuickBar 自己记（丢进去几张），每存回一张拿 PS 回的真实数校准一次。
+/// 🔴 **PS 那头绝不在心跳里问 AE**：它正压着模态框时那一发要等到它闲下来（实测 40 秒以上，
+///    见 Photoshop.swift 文件头），还会把人随后按的 F15 堵在同一条专用线程后面。
+///    但**光记账也不行** —— 人自己在 PS 里开图 / 关图 QuickBar 一概不知道，
+///    表现就是「看起来很随机」（2026-08-26 用户实测，见 `Photoshop.remaining`）。
+///    所以校准是按需的：切到 PS 时一次 + 在 PS 里时低频兜底一次，3 秒超时、静默放弃。
 final class MainImagesPill {
 
     /// 药丸此刻在替哪一头说话。
@@ -95,6 +98,18 @@ final class MainImagesPill {
     private static let doneLinger: TimeInterval = 0.6
     private var lastRemaining = 0
     private var doneTimer: Timer?
+    /// 正在播淡出动画。**`isVisible` 在这 0.14 秒里仍然是 `true`**，不单独记一笔的话
+    /// 撞上来的 `show()` 会走「已经在屏幕上，只换文字」那条分支 —— 文字换了、alpha 还在往 0 走，
+    /// 药丸当场淡没，要等下一跳才回来。
+    private var hiding = false
+
+    // PS 那头：**问它一次**（见 `Photoshop.syncRemaining`）
+    private var lastPSSync = Date.distantPast
+    /// 药丸没浮出来时问得勤一点 —— 「在 PS 里开了图药丸不出现」正是这个场景，
+    /// 人是在等它出现。
+    private static let psSyncIdle: TimeInterval = 4
+    /// 药丸已经在屏幕上了，再问只是纠正数字，慢一点没人察觉。
+    private static let psSyncShown: TimeInterval = 15
 
     private init() {}
 
@@ -219,16 +234,25 @@ final class MainImagesPill {
             }
             tickFinder()
         case Photoshop.bundleID:
-            if mode != .photoshop { mode = .photoshop; hide() }
+            if mode != .photoshop {
+                mode = .photoshop
+                hide()
+                // 刚切过来：账多半是过期的（人可能在 PS 里自己开了图、或者关掉了几张）。
+                syncPhotoshop()
+            }
             tickPhotoshop()
         default:
             if !lastSelection.isEmpty || panel?.isVisible == true { leave() }
         }
     }
 
-    /// PS 这头一个字都不问它（见文件头最后一条），只看自己记的账。
+    /// PS 这头**不在心跳里问它**，但按需校准（见 `Photoshop.syncRemaining` 那两条 🔴）。
     private func tickPhotoshop() {
         guard photoshopSideEnabled else { hide(); return }
+        // 🔴 **兜底校准不能省**：人在 PS 里自己开图（历史记录 / 双击 / 拖进去）时 PS 早就是
+        //    最前台了，激活通知永远不会来 —— 只靠激活那一次校准，药丸还是不出现。
+        let gap = Photoshop.remaining == 0 ? Self.psSyncIdle : Self.psSyncShown
+        if Date().timeIntervalSince(lastPSSync) > gap { syncPhotoshop() }
         let left = Photoshop.remaining
 
         // 最后一张存完的那一下：先说一句「都存回了」，停 0.6 秒再收 ——
@@ -259,6 +283,13 @@ final class MainImagesPill {
              tip: "把 Photoshop 当前这张拼合、按它自己的原路径覆盖存回，然后关掉 —— "
                 + "不用再在存储对话框里找那个素材文件夹。快捷键 \(key)。"
                 + "不想要它浮出来：设置 → 素材批次里关掉。")
+    }
+
+    /// 问 PS 要一次真实的「还有几张能存回」。时间戳在这儿记 —— `Photoshop.syncRemaining`
+    /// 自己会因为「正忙 / 已经在问了」直接返回，那种情况也算问过了，不该下一跳又来一发。
+    private func syncPhotoshop() {
+        lastPSSync = Date()
+        Photoshop.syncRemaining()
     }
 
     private func tickFinder() {
@@ -327,7 +358,9 @@ final class MainImagesPill {
         // 宿主窗口进了程序坞，药丸不该还浮着（设计稿：宿主被遮挡/最小化即隐藏）。
         if follow.hostMinimized { hide(); return }
 
-        let visible = panel?.isVisible == true
+        // 🔴 **正在淡出的不算「在屏幕上」**：`isVisible` 在那 0.14 秒里还是 `true`，
+        //    当成可见就只换文字不重新露头，药丸会淡到 0 然后消失。
+        let visible = panel?.isVisible == true && !hiding
         if visible, title == shownTitle, style == currentStyle, abs(fraction - currentFraction) < 0.001 {
             return
         }
@@ -356,6 +389,7 @@ final class MainImagesPill {
     private var currentFraction: CGFloat = 0
 
     private func reveal(title: String, style: PillView.Style, fraction: CGFloat, tip: String) {
+        hiding = false          // 半路杀回来：撤销正在播的淡出
         let panel = self.panel ?? makePanel()
         paint(title: title, style: style, fraction: fraction, tip: tip, animateText: false)
         place(panel)
@@ -409,6 +443,7 @@ final class MainImagesPill {
         shownTitle = ""
         follow.stop()          // 药丸不在屏幕上就没人需要知道窗口动了，回到零负载
         guard let panel, panel.isVisible else { return }
+        hiding = true
         // 出：opacity 1→0 + scale 1→.985，0.14s ease-in。**不做位移** —— 收起来的东西
         // 再把视线往下拉一下是白拉（设计稿「进出节奏」）。
         pill?.layer?.transform = CATransform3DMakeScale(0.985, 0.985, 1)
@@ -417,9 +452,12 @@ final class MainImagesPill {
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
-            guard let panel = self?.panel, panel.alphaValue < 0.01 else { return }
+            guard let self else { return }
+            // 动画期间 `reveal` 又把它拉回来了 —— 那就别收（`reveal` 已经把 `hiding` 清了）。
+            guard self.hiding, let panel = self.panel, panel.alphaValue < 0.01 else { return }
+            self.hiding = false
             panel.orderOut(nil)
-            self?.pill?.layer?.transform = CATransform3DIdentity
+            self.pill?.layer?.transform = CATransform3DIdentity
         }
     }
 
