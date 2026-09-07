@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+[data-qb="light"]{
+--glass:rgba(250,250,252,.88);--glass-top:rgba(255,255,255,.8);
+--fg:#17171a;--fg2:#75757e;--fg3:#a6a6af;--sep:rgba(0,0,0,.13);--hover:rgba(0,0,0,.05);
+--accent:#0a6cff;--accent-soft:rgba(10,108,255,.13);--on-accent:#fff;
+--shadow:drop-shadow(0 16px 34px rgba(18,20,26,.34)) drop-shadow(0 2px 5px rgba(18,20,26,.20));
+--desk:#b6b6c2;--page:#e8e8ed;--stripe:rgba(0,0,0,.055);--stripe2:rgba(0,0,0,.20);
+--note:#fdf3d8;--note-brd:rgba(150,115,25,.32);--note-fg:#5b4712;
+--origin:#eaeaf0;--origin-brd:rgba(0,0,0,.16);--dash:rgba(0,0,0,.26);--dim:#5c5c66;
+--spoke:rgba(0,0,0,.16);
+}
+[data-qb="dark"]{
+--glass:rgba(46,46,52,.88);--glass-top:rgba(255,255,255,.13);
+--fg:#f2f2f5;--fg2:#9b9ba3;--fg3:#6d6d76;--sep:rgba(255,255,255,.15);--hover:rgba(255,255,255,.07);
+--accent:#3b82ff;--accent-soft:rgba(59,130,255,.20);--on-accent:#fff;
+--shadow:drop-shadow(0 18px 40px rgba(0,0,0,.62)) drop-shadow(0 2px 6px rgba(0,0,0,.5));
+--desk:#3a3a42;--page:#17171a;--stripe:rgba(255,255,255,.05);--stripe2:rgba(255,255,255,.26);
+--note:#3a3323;--note-brd:rgba(240,166,60,.35);--note-fg:#e8d5a4;
+--origin:#41414a;--origin-brd:rgba(255,255,255,.20);--dash:rgba(255,255,255,.30);--dim:#bcbcc6;
+--spoke:rgba(255,255,255,.18);
+}
+body{margin:0;background:#e8e8ed}
+a{color:#0a6cff;text-decoration:none}
+a:hover{color:#17171a}
+</style>
+</helmet>
+
+<section data-qb="light" style="box-sizing:border-box;width:100%;padding:44px 48px 110px;background:var(--page);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Hiragino Sans GB',sans-serif;text-wrap:pretty">
+
+  <div style="max-width:880px;margin:0 0 46px">
+    <div style="font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;color:var(--fg3);margin-bottom:10px">QUICKBAR · SWITCHWHEEL · 重做</div>
+    <h1 style="margin:0;font:600 36px/1.14 -apple-system,'SF Pro Display','PingFang SC',sans-serif;letter-spacing:-.012em">三向路标</h1>
+    <div style="margin-top:12px;color:var(--fg2);font-size:14.5px;line-height:1.55">不再是三个格子。整块玻璃切成<b style="color:var(--fg)">一支双头箭头 ＋ 中间升起的尖塔</b>：左右两翼收成实体箭尖，上方那一类是从箭杆里长出来的塔。<b style="color:var(--fg)">塔的两条斜边就是 125° 和 55° 判定边界本身</b> —— 看到的边和算出来的边是同一条线，指哪就落哪。中心一枚实心原点盘 = 取消 = <span style="font-family:ui-monospace,Menlo,monospace">anchor</span>。</div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;background:var(--hover);color:var(--fg2)">660 × 222</span>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;background:var(--hover);color:var(--fg2)">anchor (330, 55)</span>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;background:var(--hover);color:var(--fg2)">110° / 70° / 110° / 70° 不变</span>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;background:var(--hover);color:var(--fg2)">无悬停态</span>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:60px">
+
+    <!-- ══════ 01 ══════ -->
+    <div id="a1" data-screen-label="01 三格 · 刚弹出" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">01</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">刚弹出，什么都没选</span>
+        <span style="font-size:12px;color:var(--fg3)">浅色 · <span style="font-family:ui-monospace,Menlo,monospace">selected == nil</span> · 原点盘亮着</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:none;padding:60px 52px;border-radius:18px;background:var(--desk);background-image:repeating-linear-gradient(135deg,var(--stripe) 0 2px,transparent 2px 10px)">
+          <div style="filter:var(--shadow)">
+            <div style="position:relative;width:660px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)">
+
+              <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 40%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)"></div>
+
+              <sc-if value="{{ spokes }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;left:0;top:0;width:660px;height:222px">
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-125deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(125deg)"></div>
+                </div>
+              </sc-if>
+
+              <div style="position:absolute;left:30px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">C店</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">万相台无界版</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:317px;top:14px;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+              <div style="position:absolute;left:264px;top:47px;width:132px;text-align:center;font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">秋季报价单</div>
+              <div style="position:absolute;left:274px;top:66px;width:112px;text-align:center;font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">文档 · WPS</div>
+
+              <div style="position:absolute;left:366px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2026-09</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">访达</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:307px;top:144px;width:46px;height:46px;box-sizing:border-box;border-radius:50%;background:var(--origin);border:1px solid var(--origin-brd);box-shadow:inset 0 1px 0 rgba(255,255,255,.5)">
+                <div style="position:absolute;left:21px;top:9px;width:2px;height:26px;border-radius:1px;background:var(--fg2)"></div>
+                <div style="position:absolute;left:9px;top:21px;width:26px;height:2px;border-radius:1px;background:var(--fg2)"></div>
+              </div>
+
+              <sc-if value="{{ cancelText }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;left:270px;top:196px;width:120px;text-align:center;font:500 10.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--dim);letter-spacing:.04em">不动 = 不切换</div>
+              </sc-if>
+            </div>
+          </div>
+          <sc-if value="{{ mouseMarker }}" hint-placeholder-val="{{ true }}">
+            <div style="position:relative;height:0">
+              <div style="position:absolute;left:324px;top:-62px;width:14px;height:14px">
+                <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#ff3b30"></div>
+                <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#ff3b30"></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 轮廓即判定</div>
+          面板不再是矩形。<b>一条 clip-path 路径</b>画完整块玻璃，14 个顶点全部可推导：<br>
+          <code style="font-size:11px">244 0 · 416 0 · 422 9 · 369 112 · 648 112 · 660 160 · 660 174 · 648 222 · 12 222 · 0 174 · 0 160 · 12 112 · 291 112 · 238 9</code><br><br>
+          <b>尖塔那两条斜边就是判定边界</b>：<code>(291,112)→(238,9)</code> 的斜率正是 125°，右边那条正是 55°。从原点 <code>(330,167)</code> 出发的射线，延长后精确穿过 <code>(238,9)</code> 和 <code>(422,9)</code>。所以「上」这一类的可视范围**不可能**超出 70° 扇区 —— 之前那种「看着指着上格、算出来是左」的翻车在几何上被排除了。<br><br>
+          <b>左右收成箭尖</b>（<code>0,160→0,174</code> 那个 14pt 的钝尖）：方向暗示做进轮廓，不靠额外的箭头图形。箭尖同时说明「这一翼一直延伸到屏幕那一侧」，跟 110° 扇区一致。<br><br>
+          <b>四根 67pt 的辐条</b>从原点按 ±55° / ±125° 射出，是四条判定边界的可见部分。下面那两根之间的三角就是「下半区 = 取消」。<br><br>
+          没有 1pt 描边 —— clip-path 会把 border 一起剪掉。改用 <b>glass 提到 .88 ＋ 顶部 40% 一道 highlight ＋ 两层 drop-shadow</b>（drop-shadow 跟着异形轮廓走，box-shadow 不会）。深浅两底上都立得住，这比描边更可靠。<br><br>
+          红十字是鼠标，不画进软件；它永远落在 anchor 上。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 02 ══════ -->
+    <div id="a2" data-screen-label="02 选中浏览器" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">02</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">选中浏览器</span>
+        <span style="font-size:12px;color:var(--fg3)">浅色 · 整个左翼实色填充，一直填到箭尖</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:none;padding:60px 52px;border-radius:18px;background:var(--desk);background-image:repeating-linear-gradient(135deg,var(--stripe) 0 2px,transparent 2px 10px)">
+          <div style="filter:var(--shadow)">
+            <div style="position:relative;width:660px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)">
+
+              <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:var(--accent);clip-path:polygon(0 160px,12px 112px,291px 112px,330px 167px,291px 222px,12px 222px,0 174px)"></div>
+              <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 40%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,369px 222px,330px 167px,291px 112px,238px 9px)"></div>
+
+              <sc-if value="{{ spokes }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;left:0;top:0;width:660px;height:222px">
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:rgba(255,255,255,.34);transform-origin:0 50%;transform:rotate(-125deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:rgba(255,255,255,.34);transform-origin:0 50%;transform:rotate(125deg)"></div>
+                </div>
+              </sc-if>
+
+              <div style="position:absolute;left:30px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">C店</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">万相台无界版</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:317px;top:14px;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+              <div style="position:absolute;left:264px;top:47px;width:132px;text-align:center;font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">秋季报价单</div>
+              <div style="position:absolute;left:274px;top:66px;width:112px;text-align:center;font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">文档 · WPS</div>
+
+              <div style="position:absolute;left:366px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2026-09</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">访达</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:307px;top:144px;width:46px;height:46px;box-sizing:border-box;border-radius:50%;background:transparent;border:1px solid var(--sep)">
+                <div style="position:absolute;left:21px;top:15px;width:2px;height:14px;border-radius:1px;background:var(--fg3)"></div>
+                <div style="position:absolute;left:15px;top:21px;width:14px;height:2px;border-radius:1px;background:var(--fg3)"></div>
+              </div>
+            </div>
+          </div>
+          <sc-if value="{{ mouseMarker }}" hint-placeholder-val="{{ true }}">
+            <div style="position:relative;height:0">
+              <div style="position:absolute;left:104px;top:-62px;width:14px;height:14px">
+                <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#fff"></div>
+                <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#fff"></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 选中态与店名</div>
+          <b>选中 = 整个扇区实色填充</b>，从原点一直填到箭尖。填充面积 ≈ 31 000 pt²，是旧版那个 200×58 格子的 2.7 倍 —— 在 PS 深色画布上余光扫一眼就分得出，这是玻璃灰底做不到的（药丸那次踩过）。<br><br>
+          左翼 clip-path：<code style="font-size:11px">0 160 · 12 112 · 291 112 · 330 167 · 291 222 · 12 222 · 0 174</code>。右翼镜像，尖塔是自己那个六边形。四块加起来正好铺满整块玻璃，无缝无叠。<br><br>
+          <b>店名和窗口标题换了位</b>：主字 = <code>badge</code>（13pt semibold），副字 = <code>windowTitle</code>（11pt medium）。<code>caption()</code> 那句「浏览器 · C店」拆开 —— 方向已经说明了这是浏览器，「浏览器」三个字不配当主字。没有 badge 时主字退回窗口标题、副字写「浏览器」。<br><br>
+          <b>选中时原点盘变空框</b>：填充和 highlight 撤掉，只留 1pt 描边 ＋ 一枚缩小到 14pt 的十字。它是原点，不是第四个选项；已经选了别处时它就该退场。<br><br>
+          <b>选中翼上那两根辐条翻白</b>（<code>rgba(255,255,255,.34)</code>），另两根保持 <code>--spoke</code>。辐条一直在，不做出现/消失动画。<br><br>
+          填充色一律 <code>NSColor.controlAccentColor</code>，别写死蓝 —— 人可能把系统强调色改成别的。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 03 ══════ -->
+    <div id="a3" data-screen-label="03 选中文档 · 深色" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">03</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">选中文档</span>
+        <span style="font-size:12px;color:var(--fg3)">深色 · 底下是 Photoshop 的深色画布</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div data-qb="dark" style="flex:none;border-radius:18px;overflow:hidden;background:#26262b;border:1px solid rgba(255,255,255,.10);box-shadow:0 24px 56px rgba(0,0,0,.42)">
+          <div style="display:flex;align-items:center;gap:6px;height:34px;padding:0 11px;background:#1e1e22;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="width:9px;height:9px;border-radius:50%;background:#ff5f57"></span>
+            <span style="width:9px;height:9px;border-radius:50%;background:#febc2e"></span>
+            <span style="width:9px;height:9px;border-radius:50%;background:#28c840"></span>
+            <span style="margin-left:8px;font:600 12px/1 ui-monospace,Menlo,monospace;color:#9b9ba3">VENA_01.jpg @ 66.7%</span>
+          </div>
+          <div style="display:flex">
+            <div style="width:34px;background:#2e2e34;border-right:1px solid rgba(255,255,255,.06)"></div>
+            <div style="padding:60px 52px;background:#3a3a41;background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 2px,transparent 2px 9px)">
+              <div style="filter:var(--shadow)">
+                <div style="position:relative;width:660px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)">
+
+                  <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:var(--accent);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,291px 112px,238px 9px)"></div>
+                  <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 40%);clip-path:polygon(369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px)"></div>
+
+                  <sc-if value="{{ spokes }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:absolute;left:0;top:0;width:660px;height:222px">
+                      <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-55deg)"></div>
+                      <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-125deg)"></div>
+                      <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(55deg)"></div>
+                      <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(125deg)"></div>
+                    </div>
+                  </sc-if>
+
+                  <div style="position:absolute;left:30px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                    <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                    <div style="min-width:0">
+                      <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">C店</div>
+                      <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">万相台无界版</div>
+                    </div>
+                  </div>
+
+                  <div style="position:absolute;left:317px;top:14px;width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 6px)"></div>
+                  <div style="position:absolute;left:264px;top:47px;width:132px;text-align:center;font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">秋季报价单</div>
+                  <div style="position:absolute;left:274px;top:66px;width:112px;text-align:center;font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">文档 · WPS</div>
+
+                  <div style="position:absolute;left:366px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                    <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                    <div style="min-width:0">
+                      <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2026-09</div>
+                      <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">访达</div>
+                    </div>
+                  </div>
+
+                  <div style="position:absolute;left:307px;top:144px;width:46px;height:46px;box-sizing:border-box;border-radius:50%;background:transparent;border:1px solid var(--sep)">
+                    <div style="position:absolute;left:21px;top:15px;width:2px;height:14px;border-radius:1px;background:var(--fg3)"></div>
+                    <div style="position:absolute;left:15px;top:21px;width:14px;height:2px;border-radius:1px;background:var(--fg3)"></div>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ mouseMarker }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative;height:0">
+                  <div style="position:absolute;left:324px;top:-192px;width:14px;height:14px">
+                    <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#fff"></div>
+                    <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#fff"></div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="width:74px;background:#2e2e34;border-left:1px solid rgba(255,255,255,.06)"></div>
+          </div>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 深色底与尖塔</div>
+          浮窗在 <code>.screenSaver</code> 层，可能落在任何底色上。深浅两套<b>只换 <code>--glass</code>（<code>rgba(46,46,52,.88)</code>）、辐条和文字色</b>，轮廓、尺寸、字号一个不动 —— 形状本身就是识别，不该随底色变。<br><br>
+          <b>尖塔选中时那块实色从箭杆顶一路填到塔尖</b>，是三个方向里视觉最"上"的一块，跟「往上甩」严格同向。塔在 y 0–112、箭杆在 112–222，所以人余光里先看到的是塔亮了，而不是去读文字。<br><br>
+          <b>塔的可视宽度随高度收窄</b>（顶 178pt、根 78pt），这不是审美选择，是 70° 扇区在每个高度上的真实宽度。所以塔里的文字必须<b>居中 ＋ 定宽截断</b>：主字 132pt、副字 112pt。别让它左对齐，左对齐会顶出扇区。<br><br>
+          深色下 <code>--accent</code> 用 <code>#3b82ff</code>（比浅色亮一档，实测 <code>controlAccentColor</code> 在深色下系统也会自动提亮，直接用系统色即可）。<br><br>
+          <b>不要给深色版加更重的投影去"托"它</b>：drop-shadow 已经跟着异形轮廓走，再加就在 PS 画布上糊出一圈脏边。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 04 ══════ -->
+    <div id="a4" data-screen-label="04 文档不可用" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">04</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">「文档」一个都没开</span>
+        <span style="font-size:12px;color:var(--fg3)">浅色 · 空塔：斜纹掏空 · 访达永不画不可用态</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:none;padding:60px 52px;border-radius:18px;background:var(--desk);background-image:repeating-linear-gradient(135deg,var(--stripe) 0 2px,transparent 2px 10px)">
+          <div style="filter:var(--shadow)">
+            <div style="position:relative;width:660px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)">
+
+              <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:repeating-linear-gradient(135deg,var(--dash) 0 1px,transparent 1px 8px);opacity:.55;clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,291px 112px,238px 9px)"></div>
+              <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 40%);clip-path:polygon(369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px)"></div>
+
+              <sc-if value="{{ spokes }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;left:0;top:0;width:660px;height:222px">
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(-125deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(55deg)"></div>
+                  <div style="position:absolute;left:330px;top:167px;width:67px;height:1px;background:var(--spoke);transform-origin:0 50%;transform:rotate(125deg)"></div>
+                </div>
+              </sc-if>
+
+              <div style="position:absolute;left:30px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">C店</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">万相台无界版</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:264px;top:52px;width:132px;text-align:center;font:500 12px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--dim);white-space:nowrap">没开着文档</div>
+
+              <div style="position:absolute;left:366px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                <div style="min-width:0">
+                  <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">打开访达</div>
+                  <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">访达 · 没开着窗口</div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:307px;top:144px;width:46px;height:46px;box-sizing:border-box;border-radius:50%;background:var(--origin);border:1px solid var(--origin-brd);box-shadow:inset 0 1px 0 rgba(255,255,255,.5)">
+                <div style="position:absolute;left:21px;top:9px;width:2px;height:26px;border-radius:1px;background:var(--fg2)"></div>
+                <div style="position:absolute;left:9px;top:21px;width:26px;height:2px;border-radius:1px;background:var(--fg2)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 不可用态</div>
+          <b>不再靠 45% 淡化图标</b>。<code>targets[lane] == nil</code> 时那个扇区换成另一种物体：<b>1pt 斜纹掏空</b>（<code>135°、1pt 线、8pt 周期、opacity .55</code>）、顶部 highlight 不铺过去、图标不画、只剩 <code>emptyHint</code> 一行居中。斜纹是"这块是空的"，比一个淡了的实心块清楚一个量级。<br><br>
+          <b>轮廓不变</b> —— 塔还在。塔是方向的一部分，为了"没东西"就把塔削掉，下次有文档时人会以为界面换了。<br><br>
+          空塔仍然<b>接受选中</b>：甩过去时给中性实色（<code>systemGray</code>，不是 accent），斜纹留在实色之上，松手什么都不发生。现有那条 <code>has ? accent : systemGray</code> 已经对了。<br><br>
+          <b>访达从来不画这个态</b>：<code>lane == .finder</code> 时 <code>has</code> 恒为真（<code>activateFinder()</code> 没窗口也会开一个）。它的空状态是<b>另一句主字</b> —— 主字「打开访达」、副字「访达 · 没开着窗口」—— 因为甩过去真的会发生事情。<br><br>
+          文档那格还有个兜底：白名单全没开时退到「最近用过的非另两类应用」（微信之类），那时它<b>不是</b>空态，主字写真实目标名。斜纹只在真的一个都挑不出来时出现。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 05 ══════ -->
+    <div id="a5" data-screen-label="05 摊开 · 浏览器 5 个" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">05</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">摊开 · 浏览器 5 个</span>
+        <span style="font-size:12px;color:var(--fg3)">浅色 · 474×222 · 左侧留着来路的箭尖</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:none;padding:48px 44px;border-radius:18px;background:var(--desk);background-image:repeating-linear-gradient(135deg,var(--stripe) 0 2px,transparent 2px 10px);display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap">
+
+          <div style="filter:var(--shadow)">
+            <div style="position:relative;width:474px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(26px 0,462px 0,474px 12px,474px 210px,462px 222px,26px 222px,14px 210px,14px 64px,0 52px,14px 40px,14px 12px)">
+              <div style="position:absolute;left:0;top:0;width:474px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 30%)"></div>
+
+              <div style="position:absolute;left:14px;top:0;width:460px;box-sizing:border-box;padding:8px 0">
+                <div style="display:flex;align-items:center;height:26px;padding:0 20px">
+                  <span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);letter-spacing:.02em">浏览器 · 5 个</span>
+                </div>
+                <div style="padding:0 8px">
+                  <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:var(--accent)">
+                    <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 5px)"></div>
+                    <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">C店</div>
+                    <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">货品全站推广_万相台无界版</div>
+                  </div>
+                  <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                    <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                    <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">天猫</div>
+                    <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">聚水潭商品管理</div>
+                  </div>
+                  <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                    <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                    <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">买家号</div>
+                    <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">淘宝网 - 淘！我喜欢</div>
+                  </div>
+                  <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                    <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                    <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dip</div>
+                    <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">收件箱 - Gmail</div>
+                  </div>
+                  <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                    <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                    <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">未认出</div>
+                    <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Client Area - DMIT</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg2)">超过 12 行 · 末行截断</div>
+            <div style="filter:var(--shadow)">
+              <div style="position:relative;width:474px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(26px 0,462px 0,474px 12px,474px 210px,462px 222px,26px 222px,14px 210px,14px 64px,0 52px,14px 40px,14px 12px)">
+                <div style="position:absolute;left:0;top:0;width:474px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 30%)"></div>
+                <div style="position:absolute;left:14px;top:0;width:460px;box-sizing:border-box;padding:8px 0">
+                  <div style="display:flex;align-items:center;height:26px;padding:0 20px">
+                    <span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);letter-spacing:.02em">访达 · 17 个</span>
+                  </div>
+                  <div style="padding:0 8px">
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:var(--accent)">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">20260903-1054_LC-0902-0D76</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2026-09</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;opacity:.45">
+                      <div style="flex:none;width:20px;height:20px"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:400 11.5px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">…第 3 – 11 行</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">主图1比1</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:repeating-linear-gradient(135deg,var(--dash) 0 1px,transparent 1px 8px)">
+                      <div style="flex:none;width:20px;height:20px"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 11.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--dim)">还有 5 个 · 松手回去再甩一次</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 摊开的列</div>
+          <b>列表左边留着一枚 14pt 的箭尖</b>，位置正对第一行的中心 <code>(0,52)</code>。它是"这一列是从左边那一翼长出来的"的唯一记号 —— 上一状态的形状痕迹留在下一状态里，人就不会觉得界面被换掉了。访达的列箭尖朝右（镜像），文档的朝上（挪到顶边中点）。<br><br>
+          <b>面板盒子变成 474 宽</b>，内容区仍是 460：<code>ListGeo.width</code> 不动，只把绘制原点右移 14。<code>anchor</code> 跟着改成 <code>(14 + 230, …)</code> —— 判定原点必须还是第一行中心。<br><br>
+          <b>店名列是这一版的主角</b>：76pt 固定宽（<code>ListGeo</code> 里已经是这个数），13pt semibold <code>labelColor</code>；窗口标题降到 12pt regular <code>secondaryLabelColor</code>。眼睛顺着左边那条竖线往下扫的是店名 —— 人脑子里想的是「去 C店 那个」。<br><br>
+          <code>badge == nil</code> 写 <b>「未认出」</b>（<code>tertiaryLabelColor</code>），不写「—」：一个破折号看不出是"没有店名"还是"店名就叫这个"。<br><br>
+          <b>超过 12 行</b>：<code>maxRows = 12</code> 保留，第 12 行换成斜纹的「还有 N 个」。它<b>不可选</b> —— <code>ListGeo.index()</code> 上界 clamp 到 <code>10</code>（0-based，前 11 行），别让人选中一行"什么都不会发生"的提示。<br><br>
+          选中行 <b>实色 accent ＋ 白字</b>，<code>insetBy(dx:0,dy:1)</code> 保留：相邻两行的选中块之间要有 2pt 缝，不然连成一片认不出边界。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 06 ══════ -->
+    <div id="a6" data-screen-label="06 摊开 · 访达 3 个 · 深色" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">06</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">摊开 · 访达 3 个</span>
+        <span style="font-size:12px;color:var(--fg3)">深色 · 没有店名列的版式 · 箭尖镜像朝右 · 474×142</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div data-qb="dark" style="flex:none;border-radius:18px;overflow:hidden;background:#26262b;border:1px solid rgba(255,255,255,.10);box-shadow:0 24px 56px rgba(0,0,0,.42)">
+          <div style="display:flex;align-items:center;gap:6px;height:34px;padding:0 11px;background:#1e1e22;border-bottom:1px solid rgba(255,255,255,.07)">
+            <span style="width:9px;height:9px;border-radius:50%;background:#ff5f57"></span>
+            <span style="width:9px;height:9px;border-radius:50%;background:#febc2e"></span>
+            <span style="width:9px;height:9px;border-radius:50%;background:#28c840"></span>
+            <span style="margin-left:8px;font:600 12px/1 ui-monospace,Menlo,monospace;color:#9b9ba3">VENA_04.jpg @ 100%</span>
+          </div>
+          <div style="padding:56px 72px;background:#3a3a41;background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 2px,transparent 2px 9px)">
+            <div style="filter:var(--shadow)">
+              <div style="position:relative;width:474px;height:142px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(12px 0,448px 0,460px 12px,460px 40px,474px 52px,460px 64px,460px 130px,448px 142px,12px 142px,0 130px,0 12px)">
+                <div style="position:absolute;left:0;top:0;width:474px;height:142px;background:linear-gradient(180deg,var(--glass-top),transparent 40%)"></div>
+                <div style="position:absolute;left:0;top:0;width:460px;box-sizing:border-box;padding:8px 0">
+                  <div style="display:flex;align-items:center;height:26px;padding:0 20px">
+                    <span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);letter-spacing:.02em">访达 · 3 个</span>
+                  </div>
+                  <div style="padding:0 8px">
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:var(--accent)">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">20260903-1054_LC-0902-0D76</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2026-09</div>
+                    </div>
+                    <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                      <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                      <div style="flex:1;min-width:0;margin-left:9px;font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">主图1比1</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 没有店名列时</div>
+          <code>showsBadge</code> 那条判据（<code>Set(badges).count &gt; 1</code>）不动。为假时<b>整列消失，标题从 x=45 挪到 x=39</b>（icon 右 9pt），不留空位、不摆一列破折号。<br><br>
+          <b>箭尖镜像到右边</b>，落在第一行中心 <code>(474,52)</code>：访达在右翼，列表就得从右边长出来。内容区回到 x 0–460。文档在上翼 —— 箭尖挪到顶边中点 <code>(230,0)</code>，做成朝上的小尖。<br><br>
+          <b>没有店名列时标题字重升一档</b>：<code>regular → medium</code>（代码里已经是 <code>showsBadge ? .regular : .medium</code>）。它这时候是唯一的区分依据，配得上更重的字。<br><br>
+          <b>行高不变，还是 36</b>：三行的列和五行的列节奏必须一样，不然「摊开」在不同类里手感不同。474×142 = <code>8*2 + 26 + 3*36</code>。<br><br>
+          访达那串时间戳目录名（<code>20260903-1054_LC-0902-0D76</code>）是这一列最长的字符串，12.5pt medium 下 <b>398pt 刚好不截断</b>。别再把行内边距加大，加大就开始吃字。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 07 ══════ -->
+    <div id="a7" data-screen-label="07 转场 三格→摊开" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">07</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">转场 · 左翼原地长成列表</span>
+        <span style="font-size:12px;color:var(--fg3)">90ms · 鼠标（红十字）三帧不动</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:none;width:max-content;padding:0;border-radius:18px;overflow:hidden;background:var(--desk);background-image:repeating-linear-gradient(135deg,var(--stripe) 0 2px,transparent 2px 10px)">
+          <div style="display:flex;width:max-content">
+
+            <div style="flex:none;width:700px;border-right:1px dashed rgba(0,0,0,.18)">
+              <div style="position:relative;height:330px">
+                <div style="position:absolute;left:46px;top:56px;filter:var(--shadow)">
+                  <div style="position:relative;width:660px;height:222px;background:var(--glass);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);clip-path:polygon(244px 0,416px 0,422px 9px,369px 112px,648px 112px,660px 160px,660px 174px,648px 222px,12px 222px,0 174px,0 160px,12px 112px,291px 112px,238px 9px)">
+                    <div style="position:absolute;left:0;top:0;width:660px;height:222px;background:var(--accent);clip-path:polygon(0 160px,12px 112px,291px 112px,330px 167px,291px 222px,12px 222px,0 174px)"></div>
+                    <div style="position:absolute;left:30px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                      <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 6px)"></div>
+                      <div style="min-width:0">
+                        <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:#fff">C店</div>
+                        <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88)">万相台无界版</div>
+                      </div>
+                    </div>
+                    <div style="position:absolute;left:317px;top:14px;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                    <div style="position:absolute;left:264px;top:47px;width:132px;text-align:center;font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg)">秋季报价单</div>
+                    <div style="position:absolute;left:366px;top:141px;width:264px;height:52px;display:flex;align-items:center;gap:11px">
+                      <div style="flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 6px)"></div>
+                      <div style="min-width:0">
+                        <div style="font:600 13px/1.3 -apple-system,'PingFang SC',sans-serif;color:var(--fg)">2026-09</div>
+                        <div style="font:500 11px/1.35 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">访达</div>
+                      </div>
+                    </div>
+                    <div style="position:absolute;left:307px;top:144px;width:46px;height:46px;box-sizing:border-box;border-radius:50%;border:1px solid var(--sep)">
+                      <div style="position:absolute;left:21px;top:15px;width:2px;height:14px;border-radius:1px;background:var(--fg3)"></div>
+                      <div style="position:absolute;left:15px;top:21px;width:14px;height:2px;border-radius:1px;background:var(--fg3)"></div>
+                    </div>
+                  </div>
+                </div>
+                <div style="position:absolute;left:114px;top:216px;width:14px;height:14px">
+                  <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#ff3b30"></div>
+                  <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#ff3b30"></div>
+                </div>
+                <div style="position:absolute;left:26px;bottom:14px;font:600 11px/1 ui-monospace,Menlo,monospace;color:rgba(0,0,0,.5)">0 ms · 停住满 450 ms</div>
+              </div>
+            </div>
+
+            <div style="flex:none;width:560px;border-right:1px dashed rgba(0,0,0,.18)">
+              <div style="position:relative;height:330px">
+                <div style="position:absolute;left:60px;top:120px;filter:var(--shadow)">
+                  <div style="position:relative;width:474px;height:150px;background:var(--glass);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);clip-path:polygon(26px 0,462px 0,474px 12px,474px 138px,462px 150px,26px 150px,14px 138px,14px 64px,0 52px,14px 40px,14px 12px)">
+                    <div style="position:absolute;left:0;top:0;width:474px;height:150px;background:var(--accent);opacity:.5;clip-path:polygon(14px 0,474px 0,474px 150px,14px 150px,14px 64px,0 52px,14px 40px)"></div>
+                    <div style="position:absolute;left:14px;top:0;width:460px;box-sizing:border-box;padding:8px 0">
+                      <div style="display:flex;align-items:center;height:26px;padding:0 20px;opacity:.55">
+                        <span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:#fff">浏览器 · 5 个</span>
+                      </div>
+                      <div style="padding:0 8px">
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:var(--accent)">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:#fff">C店</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">货品全站推广_万相台无界版</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;opacity:.4">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.4)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:#fff">天猫</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:20px;margin:1px 0;padding:0 10px;box-sizing:border-box;opacity:.2">
+                          <div style="flex:none;width:20px;height:14px;border-radius:5px;border:1px solid rgba(255,255,255,.4)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 12px/1 -apple-system,'PingFang SC',sans-serif;color:#fff">买家号</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="position:absolute;left:74px;top:216px;width:14px;height:14px">
+                  <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#ff3b30"></div>
+                  <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#ff3b30"></div>
+                </div>
+                <div style="position:absolute;left:26px;bottom:14px;font:600 11px/1 ui-monospace,Menlo,monospace;color:rgba(0,0,0,.5)">45 ms · 中间帧</div>
+              </div>
+            </div>
+
+            <div style="flex:none;width:560px">
+              <div style="position:relative;height:330px">
+                <div style="position:absolute;left:60px;top:120px;filter:var(--shadow)">
+                  <div style="position:relative;width:474px;height:222px;background:var(--glass);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);clip-path:polygon(26px 0,462px 0,474px 12px,474px 210px,462px 222px,26px 222px,14px 210px,14px 64px,0 52px,14px 40px,14px 12px)">
+                    <div style="position:absolute;left:0;top:0;width:474px;height:222px;background:linear-gradient(180deg,var(--glass-top),transparent 30%)"></div>
+                    <div style="position:absolute;left:14px;top:0;width:460px;box-sizing:border-box;padding:8px 0">
+                      <div style="display:flex;align-items:center;height:26px;padding:0 20px">
+                        <span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">浏览器 · 5 个</span>
+                      </div>
+                      <div style="padding:0 8px">
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px;background:var(--accent)">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:#fff">C店</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">货品全站推广_万相台无界版</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg)">天猫</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">聚水潭商品管理</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg)">买家号</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">淘宝网 - 淘！我喜欢</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg)">Dip</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">收件箱 - Gmail</div>
+                        </div>
+                        <div style="display:flex;align-items:center;height:34px;margin:1px 0;padding:0 10px;box-sizing:border-box;border-radius:9px">
+                          <div style="flex:none;width:20px;height:20px;border-radius:6px;border:1px solid var(--sep);background:repeating-linear-gradient(135deg,var(--stripe2) 0 1.5px,transparent 1.5px 5px)"></div>
+                          <div style="flex:none;width:76px;margin-left:9px;font:600 13px/1 -apple-system,'PingFang SC',sans-serif;color:var(--dim)">未认出</div>
+                          <div style="flex:1;min-width:0;margin-left:10px;font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Client Area - DMIT</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="position:absolute;left:74px;top:216px;width:14px;height:14px">
+                  <div style="position:absolute;left:6px;top:0;width:2px;height:14px;background:#ff3b30"></div>
+                  <div style="position:absolute;left:0;top:6px;width:14px;height:2px;background:#ff3b30"></div>
+                </div>
+                <div style="position:absolute;left:26px;bottom:14px;font:600 11px/1 ui-monospace,Menlo,monospace;color:rgba(0,0,0,.5)">90 ms · 落定</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1 1 300px;min-width:290px;max-width:420px;padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 转场</div>
+          <b>模型：选中的那一翼就是列表的容器。</b>不做面板级的交叉淡化 —— 那会让人觉得"换了个东西"。左翼已经是实色 accent 的一整块，列表的第一行也是实色 accent 的一整块：<b>转场就是这块 accent 从翼形变成行形</b>，其余部分跟着补齐。<br><br>
+          <b>90 ms，三段并行</b>，都用 <code>CAMediaTimingFunction(name:.easeOut)</code>：<br>
+          ① 面板 frame：<code>660×222 → 474×222</code>，位置按 anchor 反推（<code>anchor</code> 从 <code>(330,55)</code> 变成 <code>(244,170)</code>，屏幕上那个点不动）。<br>
+          ② 选中翼的 clip-path 路径 → 第一行的圆角矩形路径（<code>CAShapeLayer</code> + <code>path</code> 动画，顶点数要凑成一样多；不想凑就退回 opacity 交叉，但保留第一行位置不动）。<br>
+          ③ 未选中的两翼 ＋ 原点盘：<code>opacity 1 → 0</code>，<b>0 → 45 ms 就结束</b>，早于形变收尾 —— 先让干扰物消失，人的注意力才跟着新形状走。<br><br>
+          <b>第 2 行往后逐行进场</b>：每行 <code>opacity 0→1 + y −6→0</code>，<code>18 ms</code> 一档级联，总共 <code>90+4*18 = 162 ms</code> 落齐。第一行<b>不参与</b>级联 —— 它从头到尾都在原地，因为它就是默认选中的那个，摊开不改变选中的是谁。<br><br>
+          <b>入场（弹出那一下）单独给 70 ms</b>：<code>opacity 0→1 + scale .96→1</code>，锚点设在 <code>anchor</code>（<code>layer.anchorPoint = (0.5, 55/222)</code>），所以它是"从鼠标那一点撑开"，不是从面板中心。70 ms 在 1 秒出头的手势里占 7%，实测不拖手感；再长就开始有"等它"的感觉。<br><br>
+          <b>收回（横向移出去）不做形变</b>，直接 <code>60 ms</code> 交叉回三格：人这时候是在改主意，形变只会挡路。
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 08 ══════ -->
+    <div id="a8" data-screen-label="08 尺寸标注" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:3px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)">08</span>
+        <span style="font:600 17px/1.2 -apple-system,'SF Pro Display','PingFang SC',sans-serif">尺寸 · 扇区 · 取值</span>
+      </div>
+
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="padding:24px;border-radius:18px;background:#fff;border:1px solid rgba(0,0,0,.09)">
+          <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg3);margin-bottom:16px">扇区 · 不是四等分</div>
+          <div style="position:relative;width:360px;height:360px">
+            <div style="position:absolute;left:30px;top:30px;width:300px;height:300px;border-radius:50%;background:conic-gradient(from 0deg,rgba(10,108,255,.16) 0 35deg,rgba(10,108,255,.10) 35deg 145deg,rgba(0,0,0,.05) 145deg 215deg,rgba(10,108,255,.10) 215deg 325deg,rgba(10,108,255,.16) 325deg 360deg)"></div>
+            <div style="position:absolute;left:180px;top:180px;width:150px;height:1px;background:rgba(0,0,0,.28);transform-origin:0 50%;transform:rotate(-55deg)"></div>
+            <div style="position:absolute;left:180px;top:180px;width:150px;height:1px;background:rgba(0,0,0,.28);transform-origin:0 50%;transform:rotate(-125deg)"></div>
+            <div style="position:absolute;left:180px;top:180px;width:150px;height:1px;background:rgba(0,0,0,.28);transform-origin:0 50%;transform:rotate(55deg)"></div>
+            <div style="position:absolute;left:180px;top:180px;width:150px;height:1px;background:rgba(0,0,0,.28);transform-origin:0 50%;transform:rotate(125deg)"></div>
+
+            <div style="position:absolute;left:41px;top:110px;width:277px;height:93px">
+              <div style="width:277px;height:93px;background:rgba(255,255,255,.92);border:0;clip-path:polygon(102px 0,175px 0,177px 4px,155px 47px,272px 47px,277px 67px,277px 73px,272px 93px,5px 93px,0 73px,0 67px,5px 47px,122px 47px,100px 4px);box-shadow:0 2px 8px rgba(0,0,0,.14)"></div>
+            </div>
+            <div style="position:absolute;left:41px;top:110px;width:277px;height:93px;background:rgba(0,0,0,.32);clip-path:polygon(102px 0,175px 0,177px 4px,155px 47px,272px 47px,277px 67px,277px 73px,272px 93px,5px 93px,0 73px,0 67px,5px 47px,122px 47px,100px 4px)"></div>
+            <div style="position:absolute;left:41px;top:110px;width:277px;height:93px;background:#fff;clip-path:polygon(103px 1.5px,174px 1.5px,175.5px 5px,154px 48.5px,271px 48.5px,275.5px 67.5px,275.5px 72.5px,271px 91.5px,6px 91.5px,1.5px 72.5px,1.5px 67.5px,6px 48.5px,123px 48.5px,101.5px 5px)"></div>
+
+            <div style="position:absolute;left:174px;top:174px;width:12px;height:12px;border-radius:50%;background:#ff3b30;box-shadow:0 0 0 3px #fff"></div>
+
+            <div style="position:absolute;left:152px;top:40px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">70°</div>
+            <div style="position:absolute;left:36px;top:172px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">110°</div>
+            <div style="position:absolute;left:296px;top:172px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">110°</div>
+            <div style="position:absolute;left:146px;top:310px;font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--fg2)">70° 取消</div>
+          </div>
+          <div style="margin-top:8px;max-width:340px;font-size:11.5px;line-height:1.6;color:var(--fg2)">红点 = <span style="font-family:ui-monospace,Menlo,monospace">anchor</span>，也是鼠标。<b style="color:var(--fg)">塔的两条斜边压在 55° / 125° 那两条判定线上</b> —— 轮廓和扇区是同一套数。</div>
+        </div>
+
+        <div style="flex:1 1 420px;min-width:400px;display:flex;flex-direction:column;gap:16px">
+
+          <div style="padding:18px 20px;border-radius:14px;background:#fff;border:1px solid rgba(0,0,0,.09)">
+            <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg3);margin-bottom:14px">几何 · WheelGeo</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:9px 20px;font-size:12.5px">
+              <span style="color:var(--fg2)">panelSize</span><span style="font-family:ui-monospace,Menlo,monospace">660 × 222</span>
+              <span style="color:var(--fg2)">anchor（AppKit 下原点在左下）</span><span style="font-family:ui-monospace,Menlo,monospace">(330, 55)</span>
+              <span style="color:var(--fg2)">箭杆</span><span style="font-family:ui-monospace,Menlo,monospace">y 112 – 222，高 110</span>
+              <span style="color:var(--fg2)">塔</span><span style="font-family:ui-monospace,Menlo,monospace">y 0 – 112，顶宽 178 / 根宽 78</span>
+              <span style="color:var(--fg2)">箭尖</span><span style="font-family:ui-monospace,Menlo,monospace">14pt 钝尖 @ y 160 – 174</span>
+              <span style="color:var(--fg2)">外角切角</span><span style="font-family:ui-monospace,Menlo,monospace">10 – 12pt，45°</span>
+              <span style="color:var(--fg2)">原点盘</span><span style="font-family:ui-monospace,Menlo,monospace">⌀ 46，居中于 anchor</span>
+              <span style="color:var(--fg2)">辐条</span><span style="font-family:ui-monospace,Menlo,monospace">1pt × 67，±55° / ±125°</span>
+              <span style="color:var(--fg2)">扇区</span><span style="font-family:ui-monospace,Menlo,monospace">右 110 · 上 70 · 左 110 · 下 70</span>
+              <span style="color:var(--fg2)">摊开面板</span><span style="font-family:ui-monospace,Menlo,monospace">474 宽（内容 460 + 箭尖 14）</span>
+              <span style="color:var(--fg2)">摊开 anchor</span><span style="font-family:ui-monospace,Menlo,monospace">第一行中心，(244, H−52)</span>
+              <span style="color:var(--fg2)">行高 / 标题行 / 内边距</span><span style="font-family:ui-monospace,Menlo,monospace">36 / 26 / 8</span>
+              <span style="color:var(--fg2)">行圆角 / 上下内缩</span><span style="font-family:ui-monospace,Menlo,monospace">9 / 1</span>
+              <span style="color:var(--fg2)">店名列</span><span style="font-family:ui-monospace,Menlo,monospace">76，右侧 gap 10</span>
+              <span style="color:var(--fg2)">最多行数</span><span style="font-family:ui-monospace,Menlo,monospace">12（第 12 行 = 「还有 N 个」，不可选）</span>
+              <span style="color:var(--fg2)">摊开延时</span><span style="font-family:ui-monospace,Menlo,monospace">450 ms</span>
+            </div>
+          </div>
+
+          <div style="padding:18px 20px;border-radius:14px;background:#fff;border:1px solid rgba(0,0,0,.09)">
+            <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg3);margin-bottom:14px">字号</div>
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:9px 18px;font-size:12.5px;align-items:baseline">
+              <span style="color:var(--fg2)">三格主字（店名 / 窗口标题）</span><span style="font:600 13px/1 -apple-system,'PingFang SC',sans-serif">C店</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">13 semibold</span>
+              <span style="color:var(--fg2)">三格副字</span><span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">万相台无界版</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">11 medium</span>
+              <span style="color:var(--fg2)">列表标题行</span><span style="font:500 11px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">浏览器 · 5 个</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">11 medium</span>
+              <span style="color:var(--fg2)">列表店名</span><span style="font:600 13px/1 -apple-system,'PingFang SC',sans-serif">天猫</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">13 semibold</span>
+              <span style="color:var(--fg2)">列表标题（有店名列）</span><span style="font:400 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg2)">聚水潭商品管理</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">12 regular</span>
+              <span style="color:var(--fg2)">列表标题（无店名列）</span><span style="font:500 12.5px/1 -apple-system,'PingFang SC',sans-serif">主图1比1</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">12.5 medium</span>
+              <span style="color:var(--fg2)">空态 / 截断行</span><span style="font:500 12px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg3)">没开着文档</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">12 medium</span>
+              <span style="color:var(--fg2)">「不动 = 不切换」</span><span style="font:500 10.5px/1 -apple-system,'PingFang SC',sans-serif;color:var(--fg3)">不动 = 不切换</span><span style="font-family:ui-monospace,Menlo,monospace;color:var(--fg3)">10.5 medium</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="flex:1 1 240px;padding:18px 20px;border-radius:14px;background:#fff;border:1px solid rgba(0,0,0,.09)">
+              <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg3);margin-bottom:14px">浅色</div>
+              <div style="display:flex;flex-direction:column;gap:9px;font:11.5px/1 ui-monospace,Menlo,monospace">
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:rgba(250,250,252,.88);border:1px solid rgba(0,0,0,.12)"></span>glass .88</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#0a6cff"></span>#0a6cff accent</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#eaeaf0;border:1px solid rgba(0,0,0,.16)"></span>#eaeaf0 origin</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#17171a"></span>#17171a fg</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#75757e"></span>#75757e fg2</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#a6a6af"></span>#a6a6af fg3</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:rgba(0,0,0,.16)"></span>spoke .16</div>
+              </div>
+            </div>
+            <div data-qb="dark" style="flex:1 1 240px;padding:18px 20px;border-radius:14px;background:#1f1f23;border:1px solid rgba(255,255,255,.11);color:#f2f2f5">
+              <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--fg3);margin-bottom:14px">深色</div>
+              <div style="display:flex;flex-direction:column;gap:9px;font:11.5px/1 ui-monospace,Menlo,monospace">
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:rgba(46,46,52,.88);border:1px solid rgba(255,255,255,.15)"></span>glass .88</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#3b82ff"></span>#3b82ff accent</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#41414a;border:1px solid rgba(255,255,255,.20)"></span>#41414a origin</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#f2f2f5"></span>#f2f2f5 fg</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#9b9ba3"></span>#9b9ba3 fg2</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:#6d6d76"></span>#6d6d76 fg3</div>
+                <div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.18)"></span>spoke .18</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:14px 16px;border-radius:12px;background:var(--note);border:1px solid var(--note-brd);color:var(--note-fg);font-size:12px;line-height:1.6">
+            <div style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;opacity:.75;margin-bottom:7px">实现侧 · 三条别忘</div>
+⓪ <b>真界面文字不用最浅那档灰</b>：<code>--dim #5c5c66</code>（深色 <code>#bcbcc6</code>）用于「没开着文档」「未认出」「还有 N 个」「不动 = 不切换」这类<b>软件里真的会出现</b>的字，<code>tertiaryLabelColor</code> 只留给稿子上的标注。空态本来就是"区分得不够"，再用最弱的墨等于没改。<br>
+            ① <b>面板一个鼠标事件都不接</b>（<code>ignoresMouseEvents = true</code>）。这份稿子里没有任何悬停或按下态 —— 全部反馈只有「选中 / 未选中」这一种差别，别照着别的浮窗补 hover。<br>
+            ② <b>判定原点是原点盘中心，不是面板几何中心</b>。面板 660×222 的几何中心在 <code>(330,111)</code>，anchor 在 <code>(330,167)</code>，差 56pt。摆窗口时按 anchor 减出 frame（现有 <code>show()</code> 已经这么做了），被 <code>clamp</code> 推回屏幕内之后 <code>origin</code> 也要跟着从新 frame 反推。<br>
+            ③ <b>绘制和判定同一处算</b>。轮廓的 14 个顶点里，<code>238 9 / 291 112 / 369 112 / 422 9</code> 这四个必须由 <code>anchor</code> 和 <code>55°</code> 现算，不能手抄常量 —— 抄一次就会漂，漂的表现是"看着指着一格、松手切去别处"。<code>VerifyWheelGeo.sh</code> 里加一条断言：这四个点到 anchor 的连线角度必须等于 ±55° / ±125°。
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;spokes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;方向暗示&quot;},&quot;cancelText&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;方向暗示&quot;},&quot;mouseMarker&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;标注&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props || {};
+    return {
+      spokes: p.spokes ?? true,
+      cancelText: p.cancelText ?? true,
+      mouseMarker: p.mouseMarker ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

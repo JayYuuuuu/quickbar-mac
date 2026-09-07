@@ -24,18 +24,41 @@ awk '/^\/\/ MARK: - 几何/{f=1} f{print}' Sources/QuickBar/UI/SwitchWheel.swift
 
 cat >> "$TMP" <<'SWIFT'
 
+
+/// 🔴 `bitmapImageRepForCachingDisplay` 出来的位图**底是不透明白**，
+///    光靠"先在画布上垫底、再把图贴上去"盖不住 —— 深色那张当场露馅：白底上看不见白字。
+///    把视图放进一个带底色的容器里一起 cacheDisplay，位图里才有正确的底。
+func shell(_ v: NSView, dark: Bool) -> NSImage {
+    let pad: CGFloat = 20
+    let size = v.bounds.size
+    let box = NSView(frame: NSRect(x: 0, y: 0, width: size.width + pad * 2, height: size.height + pad * 2))
+    box.wantsLayer = true
+    box.layer?.backgroundColor = (dark ? NSColor(calibratedWhite: 0.13, alpha: 1)
+                                       : NSColor(calibratedWhite: 0.90, alpha: 1)).cgColor
+    box.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    v.setFrameOrigin(NSPoint(x: pad, y: pad))
+    box.addSubview(v)
+    box.layoutSubtreeIfNeeded()
+    let canvas = NSImage(size: box.bounds.size)
+    guard let rep = box.bitmapImageRepForCachingDisplay(in: box.bounds) else { return canvas }
+    box.cacheDisplay(in: box.bounds, to: rep)
+    canvas.addRepresentation(rep)
+    return canvas
+}
+
 func icon(_ bundleID: String) -> NSImage? {
     guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
     return NSWorkspace.shared.icon(forFile: url.path)
 }
 
-func shot(_ selected: SwitchLane?, dark: Bool, empty: Bool = false, file: String, dir: String) {
+func shot(_ selected: SwitchLane?, dark: Bool, empty: Bool = false, emptyDoc: Bool = false,
+          file: String, dir: String) {
     _ = NSApplication.shared
     var targets: [SwitchLane: SwitchTarget] = [:]
     if !empty {
         targets[.browser] = SwitchTarget(pid: 1, appName: "Google Chrome",
                                          icon: icon("com.google.Chrome"),
-                                         windowTitle: "货品全站推广_万相台无界版")
+                                         windowTitle: "货品全站推广_万相台无界版", badge: "C店")
         targets[.document] = SwitchTarget(pid: 2, appName: "wpsoffice",
                                           icon: icon("com.kingsoft.wpsoffice.mac"),
                                           windowTitle: "2026 秋季报价单.docx")
@@ -44,21 +67,20 @@ func shot(_ selected: SwitchLane?, dark: Bool, empty: Bool = false, file: String
                                         windowTitle: "20260903-1054_LC-0902-0D76")
     }
 
-    let v = WheelView(frame: NSRect(origin: .zero, size: WheelView.panelSize))
+    if emptyDoc { targets[.document] = nil }
+    if empty || emptyDoc { targets[.document] = nil; targets[.finder] = nil }
+    let v = WheelView(frame: NSRect(origin: .zero, size: WheelGeo.panelSize))
     v.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-    v.update(targets: targets, selected: selected)
+    v.update(targets: targets, selected: emptyDoc ? nil : selected)
+    // 🔴 离屏渲染（cacheDisplay）不走 layer，NSVisualEffectView 的 maskImage 在这儿看不出来。
+    //    把它摘掉，这张图就是"我自己画的那层"的真实结果 —— 玻璃和遮罩只能装机看。
+    v.subviews.first?.isHidden = true
     v.layoutSubtreeIfNeeded()
     guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
     v.cacheDisplay(in: v.bounds, to: rep)
 
     // 垫一块中性底 —— 面板自己的毛玻璃是透明的，不垫底看不出格子的深浅关系。
-    let size = v.bounds.size
-    let canvas = NSImage(size: NSSize(width: size.width + 40, height: size.height + 40))
-    canvas.lockFocus()
-    (dark ? NSColor(white: 0.13, alpha: 1) : NSColor(white: 0.90, alpha: 1)).setFill()
-    NSBezierPath(rect: NSRect(origin: .zero, size: canvas.size)).fill()
-    rep.draw(in: NSRect(x: 20, y: 20, width: size.width, height: size.height))
-    canvas.unlockFocus()
+    let canvas = shell(v, dark: dark)
     if let t = canvas.tiffRepresentation, let b = NSBitmapImageRep(data: t),
        let png = b.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) {
         try? png.write(to: URL(fileURLWithPath: "\(dir)/\(file).png"))
@@ -75,6 +97,7 @@ func shotList(_ lane: SwitchLane, _ rows: [(String?, String, String)], index: In
     let v = WheelView(frame: NSRect(origin: .zero, size: size))
     v.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
     v.update(lane: lane, members: members, index: index)
+    v.subviews.first?.isHidden = true
     v.layoutSubtreeIfNeeded()
     guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
     v.cacheDisplay(in: v.bounds, to: rep)
@@ -96,7 +119,8 @@ shot(nil,        dark: false, file: "1-刚弹出-浅", dir: dir)
 shot(.browser,   dark: false, file: "2-甩左浏览器-浅", dir: dir)
 shot(.document,  dark: true,  file: "3-甩上文档-深", dir: dir)
 shot(.finder,    dark: true,  file: "4-甩右访达-深", dir: dir)
-shot(.browser,   dark: false, empty: true, file: "5-一个都没开-浅", dir: dir)
+shot(.document,  dark: false, empty: true, file: "5-文档一个都没开-浅", dir: dir)
+shot(.document,  dark: false, emptyDoc: true, file: "5b-空塔未选中-浅", dir: dir)
 
 let chrome = "com.google.Chrome"
 shotList(.browser, [
@@ -112,6 +136,10 @@ shotList(.finder, [
     (nil, "2026-09", "com.apple.finder"),
     (nil, "主图1比1", "com.apple.finder"),
 ], index: 1, dark: true, file: "7-摊开访达-深", dir: dir)
+
+var many: [(String?, String, String)] = []
+for i in 1...15 { many.append((nil, "窗口 \(i)", "com.apple.finder")) }
+shotList(.finder, many, index: 0, dark: false, file: "9-摊开超过12个-浅", dir: dir)
 
 shotList(.document, [
     ("wpsoffice", "2026 秋季报价单.docx", "com.kingsoft.wpsoffice.mac"),
