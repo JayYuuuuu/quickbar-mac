@@ -51,7 +51,7 @@ final class SwitchWheel {
 
         lastMouse = mouse
         startTicking()
-        fetchTitles(round: myRound)
+        fetchDetails(round: myRound)
     }
 
     /// 松开修饰键：切过去。
@@ -62,6 +62,7 @@ final class SwitchWheel {
         guard let lane else { return }
 
         if let target = targets[lane] {
+            Notify.log("三向甩✓ 切到 \(target.caption(lane))：\(target.label)(\(target.pid))")
             WindowSwitch.activate(pid: target.pid)
         } else if lane == .finder {
             // 访达一个窗口都没开也要给人开一个，否则就是「甩了没反应」。
@@ -114,22 +115,34 @@ final class SwitchWheel {
 
     // MARK: - 标题
 
-    /// 三格的窗口标题在后台读，读到了再换上去。**弹出这一路上不能等它** ——
+    /// 三格的窗口标题和店名都在后台读，读到了再换上去。**弹出这一路上不能等它** ——
     /// AX 是跨进程 IPC，对面卡住就跟着卡，而这个面板的全部价值就在于「按下就在」。
-    private func fetchTitles(round myRound: Int) {
+    private func fetchDetails(round myRound: Int) {
         let snapshot = targets
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var titles: [SwitchLane: String] = [:]
+            var badges: [SwitchLane: String] = [:]
             for (lane, target) in snapshot {
                 if let raw = WindowSwitch.windowTitle(pid: target.pid) {
                     titles[lane] = WindowSwitch.trim(raw, appName: target.appName)
+                }
+                if lane == .browser, let label = BrowserPorts.info(pid: target.pid)?.label {
+                    badges[lane] = label
                 }
             }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self, self.round == myRound, self.isShowing else { return }
                     for (lane, title) in titles { self.targets[lane]?.windowTitle = title }
+                    for (lane, badge) in badges { self.targets[lane]?.badge = badge }
                     self.view?.update(targets: self.targets, selected: self.selected)
+                    // 🔴 唯一的观测口。这块浮窗**远程截不到屏**（ssh 里 screencapture 报错），
+                    //    格子上到底写了什么、店名认没认出来，只能靠这一行看。
+                    let dump = SwitchLane.allCases.compactMap { lane -> String? in
+                        guard let t = self.targets[lane] else { return "\(lane.title)=—" }
+                        return "\(t.caption(lane))=\(t.label)(\(t.pid))"
+                    }.joined(separator: "  ")
+                    Notify.log("三向甩→ \(dump)")
                 }
             }
         }
@@ -327,7 +340,8 @@ private final class CellsView: NSView {
         let primary: NSColor = on ? .white : (has ? .labelColor : .tertiaryLabelColor)
         let secondary: NSColor = on ? NSColor.white.withAlphaComponent(0.75) : .secondaryLabelColor
 
-        draw(lane.title, at: NSRect(x: textX, y: r.midY + 1, width: textW, height: 15),
+        draw(target?.caption(lane) ?? lane.title,
+             at: NSRect(x: textX, y: r.midY + 1, width: textW, height: 15),
              font: .systemFont(ofSize: 10.5, weight: .medium), color: secondary)
         draw(target?.label ?? lane.emptyHint,
              at: NSRect(x: textX, y: r.midY - 17, width: textW, height: 17),

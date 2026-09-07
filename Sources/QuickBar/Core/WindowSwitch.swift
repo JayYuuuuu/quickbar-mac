@@ -37,11 +37,20 @@ struct SwitchTarget {
     /// 窗口标题（异步补上）。5 个 Chrome 图标一模一样，**只有它能区分**，
     /// 所以这不是装饰，是这个功能能不能用的关键。
     var windowTitle: String?
+    /// PortManager 里那个店名（「C店」「天猫」）。非 PortManager 管的浏览器没有。见 BrowserPorts。
+    var badge: String?
 
     /// 格子上那行主字：有窗口标题就用标题，没有就退回应用名。
     var label: String {
         guard let t = windowTitle, !t.isEmpty else { return appName }
         return t
+    }
+
+    /// 格子上那行小灰字。**店名比「浏览器」三个字有用得多** —— 方向本来就说明了这是浏览器那格，
+    /// 人真正要确认的是「这是哪个店」。
+    func caption(_ lane: SwitchLane) -> String {
+        guard let badge, !badge.isEmpty else { return lane.title }
+        return "\(lane.title) · \(badge)"
     }
 }
 
