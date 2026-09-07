@@ -84,7 +84,11 @@ enum TriggerMode: String, Codable, CaseIterable {
 /// 三向甩的呼出键。手势永远是「按住修饰键 → 敲一下这个键 → 甩 → 松开修饰键」，
 /// 所以修饰键是必须的（它就是那个"按住"）。
 ///
-/// 🔴 **⌥` 别选**：PortManager 的轮盘用的就是它，两个软件在同一台机器上跑。
+/// 🔴 **「Tab 上面那个键」（`）三种配法里只有 ⌃` 是空的**（2026-09-07 查证）：
+/// **⌘`** 是系统的「循环显示各窗口」，绑上去等于把它从所有应用里吞掉；
+/// **⌥`** 是 PortManager 轮盘的默认键（它设置里那条原文就叫「⌥ `（Tab 上面那个键）」），
+/// 两个软件在同一台机器上跑。所以列表里只放 ⌃`，另外两个连摆都不摆 ——
+/// 摆一个必然踩坑的选项，等于把自己的实现细节摊给人看。
 /// ⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占（都是 PortManager 那边实测过的）。
 struct SwitchWheelKey: Identifiable, Hashable, Codable {
     let keyCode: UInt16
@@ -103,7 +107,7 @@ struct SwitchWheelKey: Identifiable, Hashable, Codable {
     static let presets: [SwitchWheelKey] = [
         SwitchWheelKey(keyCode: 48, flags: opt),           // ⌥Tab —— 默认，跟 ⌘Tab 同一套肌肉记忆
         SwitchWheelKey(keyCode: 48, flags: ctrl),          // ⌃Tab
-        SwitchWheelKey(keyCode: 48, flags: opt | cmd),     // ⌥⌘Tab
+        SwitchWheelKey(keyCode: 50, flags: ctrl),          // ⌃` —— Tab 正上方那个键，唯一没人占的配法
         SwitchWheelKey(keyCode: 12, flags: opt),           // ⌥Q
     ]
 }

@@ -422,7 +422,7 @@ private struct TriggerPane: View {
                         ForEach(SwitchWheelKey.presets) { Text($0.label).tag($0) }
                     } label: {
                         Text("呼出键")
-                            .help("⌥` 别选：PortManager 的轮盘占着它。⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占，都不在这个列表里。")
+                            .help("Tab 上面那个键只列了 ⌃`：⌘` 是系统的「循环显示各窗口」，⌥` 是 PortManager 轮盘的默认键，绑上去都会把人家吞掉。⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占，同理不列。")
                     }
                     .pickerStyle(.segmented)
                 }
