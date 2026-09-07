@@ -81,6 +81,33 @@ enum TriggerMode: String, Codable, CaseIterable {
     }
 }
 
+/// 三向甩的呼出键。手势永远是「按住修饰键 → 敲一下这个键 → 甩 → 松开修饰键」，
+/// 所以修饰键是必须的（它就是那个"按住"）。
+///
+/// 🔴 **⌥` 别选**：PortManager 的轮盘用的就是它，两个软件在同一台机器上跑。
+/// ⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占（都是 PortManager 那边实测过的）。
+struct SwitchWheelKey: Identifiable, Hashable, Codable {
+    let keyCode: UInt16
+    let flags: UInt
+
+    var id: String { "\(keyCode)-\(flags)" }
+
+    var label: String {
+        KeySymbols.describe(flags: CGEventFlags(rawValue: UInt64(flags)), keyCode: CGKeyCode(keyCode))
+    }
+
+    private static let opt = UInt(CGEventFlags.maskAlternate.rawValue)
+    private static let ctrl = UInt(CGEventFlags.maskControl.rawValue)
+    private static let cmd = UInt(CGEventFlags.maskCommand.rawValue)
+
+    static let presets: [SwitchWheelKey] = [
+        SwitchWheelKey(keyCode: 48, flags: opt),           // ⌥Tab —— 默认，跟 ⌘Tab 同一套肌肉记忆
+        SwitchWheelKey(keyCode: 48, flags: ctrl),          // ⌃Tab
+        SwitchWheelKey(keyCode: 48, flags: opt | cmd),     // ⌥⌘Tab
+        SwitchWheelKey(keyCode: 12, flags: opt),           // ⌥Q
+    ]
+}
+
 /// 触发用的修饰键。
 enum TriggerModifier: String, Codable, CaseIterable {
     case option, control, command, function
@@ -152,6 +179,15 @@ struct Settings: Codable {
     /// 那种机器得用 hidutil / Karabiner 把别的键映射成 F15（见 CLAUDE.md）。
     var psSaveBackKeyCode: UInt16 = 113   // kVK_F15 = 0x71
     var psSaveBackModifierFlags: UInt = 0
+
+    /// 三向甩：按住 ⌥ 敲一下 Tab 浮出三格（浏览器 / 文档 / 访达），手往一个方向甩，松开 ⌥ 切过去。
+    /// 见 UI/SwitchWheel.swift。
+    var switchWheelEnabled: Bool = true
+    /// 默认 **⌥Tab**：跟 ⌘Tab 是同一套肌肉记忆（按住修饰键敲一下、修饰键松开就落地），
+    /// 而且不跟 PortManager 的 ⌥` 撞 —— 那两个软件在同一台机器上跑。
+    /// ⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占，都是 PortManager 那边实测过的，别用。
+    var switchWheelKeyCode: UInt16 = 48   // kVK_Tab
+    var switchWheelModifierFlags: UInt = UInt(CGEventFlags.maskAlternate.rawValue)
 
     /// 设置界面上标着「固定，不可修改」的那几个键。**解设置时忽略磁盘上的值**，
     /// 永远用这里的默认值——否则改默认快捷键只对新用户生效。见 `Store.decodeSettings`。

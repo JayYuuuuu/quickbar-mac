@@ -16,6 +16,14 @@ final class EventTapService {
     var onTrigger: ((CGPoint) -> Void)?
     /// 在文件面板里按了跳转键。
     var onJumpToFinder: (() -> Void)?
+    /// 三向甩：热键按下了（浮出三格），以及按住的那个修饰键松开了（切过去 / 放弃）。
+    /// 见 UI/SwitchWheel.swift。
+    var onSwitchWheelShow: (() -> Void)?
+    var onSwitchWheelCommit: (() -> Void)?
+    var onSwitchWheelCancel: (() -> Void)?
+    /// 按住修饰键时用 ←↑→ 选方向（`nil` = 回到「取消」）。手在键盘上时鼠标够不着。
+    var onSwitchWheelDirection: ((SwitchLane?) -> Void)?
+
     /// 人敲了键或松开了鼠标。药丸拿它当「访达里的选中项可能变了」的信号 ——
     /// 见 `MainImagesPill.noteUserInput`。**这里不判断前台是谁**：那要读一次
     /// `NSWorkspace`，而这个回调是每一次按键都会走的，判断留给主线程那边做。
@@ -33,6 +41,10 @@ final class EventTapService {
     /// 双击 ⌘ 的状态。
     private var lastCommandRelease: CFAbsoluteTime = 0
     private var commandWasAlone = false
+
+    /// 三向甩正浮着。**只有 tap 线程读写它**，所以不需要加锁；
+    /// 主线程那边如果面板已经自己收了，收到 commit 也只是空转。
+    private var switchArmed = false
 
     private init() {}
 
@@ -144,6 +156,33 @@ final class EventTapService {
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags.intersection(TriggerModifier.allFlags)
 
+        // 三向甩（默认 ⌥Tab）：这一下只负责浮出三格，落地在修饰键松开那一刻（见 handleFlagsChanged）。
+        // 🔴 已经浮着时再按一下**不重弹** —— 人这会儿已经把鼠标甩出去了，重新弹会跳回鼠标当前位置，
+        //    等于把刚甩出去的方向抹掉。
+        if settings.switchWheelEnabled {
+            let wanted = CGEventFlags(rawValue: UInt64(settings.switchWheelModifierFlags))
+                .intersection(TriggerModifier.allFlags)
+            if !wanted.isEmpty, keyCode == CGKeyCode(settings.switchWheelKeyCode), flags == wanted {
+                if !switchArmed {
+                    switchArmed = true
+                    DispatchQueue.main.async { [weak self] in self?.onSwitchWheelShow?() }
+                }
+                return nil
+            }
+            if switchArmed {
+                if keyCode == Keyboard.escape {
+                    switchArmed = false
+                    DispatchQueue.main.async { [weak self] in self?.onSwitchWheelCancel?() }
+                    return nil
+                }
+                // ←↑→ 选方向，↓ 回到「取消」。都吞掉 —— 这会儿方向键属于这块浮窗。
+                if let arrow = Keyboard.switchArrow(keyCode) {
+                    DispatchQueue.main.async { [weak self] in self?.onSwitchWheelDirection?(arrow.lane) }
+                    return nil
+                }
+            }
+        }
+
         // 去水印的收尾：拼合 → 按原路径覆盖存回 → 关掉这张（见 Core/Photoshop.swift）。
         if settings.psSaveBackEnabled,
            keyCode == CGKeyCode(settings.psSaveBackKeyCode),
@@ -198,6 +237,18 @@ final class EventTapService {
 
     /// 连按两下 ⌘：两次「按下又松开且期间没按别的键」的间隔小于 400ms。
     private func handleFlagsChanged(_ event: CGEvent) {
+        // 三向甩的落地：按住的那个修饰键一松，指着哪格就切到哪格。
+        // 🔴 用「修饰键松开」而不是「Tab 松开」——Tab 是敲一下就弹起来的，
+        //    人的手势是「按住 ⌥ → 敲 Tab → 甩 → 放 ⌥」，跟 ⌘Tab 一模一样。
+        if switchArmed {
+            let wanted = CGEventFlags(rawValue: UInt64(Store.shared.settings.switchWheelModifierFlags))
+                .intersection(TriggerModifier.allFlags)
+            if event.flags.intersection(wanted) != wanted {
+                switchArmed = false
+                DispatchQueue.main.async { [weak self] in self?.onSwitchWheelCommit?() }
+            }
+        }
+
         guard Store.shared.settings.trigger == .doubleCommand else { return }
         let hasCommand = event.flags.contains(.maskCommand)
         let others = event.flags.intersection([.maskAlternate, .maskControl, .maskShift])

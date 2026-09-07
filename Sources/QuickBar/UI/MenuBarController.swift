@@ -37,6 +37,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let paused = !EventTapService.shared.isRunning
         menu.addItem(item(paused ? "恢复触发" : "暂停触发", action: #selector(toggleTrigger)))
 
+        // 三向甩。摆在这儿主要是**让人知道有这么个手势** —— 它没有任何可见的常驻入口，
+        // 不写在菜单里就只有设置页里那一行，等于没做（PortManager 2.6.0 的原话）。
+        let key = SwitchWheelKey(keyCode: Store.shared.settings.switchWheelKeyCode,
+                                 flags: Store.shared.settings.switchWheelModifierFlags)
+        let wheel = item("三向甩 \(key.label)", action: #selector(toggleSwitchWheel))
+        wheel.state = Store.shared.settings.switchWheelEnabled ? .on : .off
+        wheel.toolTip = "按住修饰键敲一下呼出键，浮出三格：左 = 浏览器、上 = 文档、右 = 访达，每格是你上次在的那个窗口。手往一个方向甩，松开修饰键切过去；不动或往下甩 = 放弃。换键在「设置 → 触发」。"
+        menu.addItem(wheel)
+
         if Permissions.isGranted(.automation) {
             let jump = item("跳到 Finder 当前", action: #selector(jumpToFinder))
             jump.toolTip = FinderService.shared.currentPath
@@ -134,6 +143,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func showQuickBar() { onShowQuickBar?() }
     @objc private func toggleTrigger() { onToggleTrigger?() }
+    @objc private func toggleSwitchWheel() {
+        Store.shared.settings.switchWheelEnabled.toggle()
+    }
     @objc private func openSettings() { onOpenSettings?() }
     @objc private func openPermissions() { onOpenPermissions?() }
     @objc private func jumpToFinder() { onJumpToFinder?() }

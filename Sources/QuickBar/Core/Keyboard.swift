@@ -7,6 +7,31 @@ enum Keyboard {
     static let v: CGKeyCode = 9
     static let enter: CGKeyCode = 36
     static let escape: CGKeyCode = 53
+    static let arrowLeft: CGKeyCode = 123
+    static let arrowRight: CGKeyCode = 124
+    static let arrowDown: CGKeyCode = 125
+    static let arrowUp: CGKeyCode = 126
+
+    /// 三向甩：方向键指向哪一格。`nil` = 这个键跟三向甩无关，`.cancel` = 回到「取消」。
+    enum SwitchArrow {
+        case lane(SwitchLane)
+        case cancel
+
+        var lane: SwitchLane? {
+            if case .lane(let l) = self { return l }
+            return nil
+        }
+    }
+
+    static func switchArrow(_ keyCode: CGKeyCode) -> SwitchArrow? {
+        switch keyCode {
+        case arrowLeft: return .lane(.browser)
+        case arrowUp: return .lane(.document)
+        case arrowRight: return .lane(.finder)
+        case arrowDown: return .cancel
+        default: return nil
+        }
+    }
 
     /// 塞进 eventSourceUserData 的暗号，认自家事件用。
     static let signature: Int64 = 0x5155_4943_4B42   // "QUICKB"

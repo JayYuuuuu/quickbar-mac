@@ -355,6 +355,20 @@ private struct ItemRow: View {
 private struct TriggerPane: View {
     @ObservedObject var store: Store
 
+    /// 设置里存的是键码 + 修饰键两个数，界面上是一个选择器，这里把两边接起来。
+    private var switchKeyBinding: Binding<SwitchWheelKey> {
+        Binding(
+            get: {
+                SwitchWheelKey(keyCode: store.settings.switchWheelKeyCode,
+                               flags: store.settings.switchWheelModifierFlags)
+            },
+            set: {
+                store.settings.switchWheelKeyCode = $0.keyCode
+                store.settings.switchWheelModifierFlags = $0.flags
+            }
+        )
+    }
+
     var body: some View {
         Form {
             Section("唤出快捷条") {
@@ -396,6 +410,24 @@ private struct TriggerPane: View {
                         }
                     }
                 }
+            }
+
+            Section {
+                Toggle(isOn: $store.settings.switchWheelEnabled) {
+                    Text("按住甩一下，切到浏览器 / 文档 / 访达")
+                        .help("按住修饰键敲一下呼出键，屏幕上浮出三格：左 = 浏览器、上 = 文档、右 = 访达，每格是你上次在的那个窗口。手往一个方向甩，松开修饰键就切过去；不动或往下甩 = 放弃。多开的 Chrome 认的是具体那一个实例，不是随便挑一个。")
+                }
+                if store.settings.switchWheelEnabled {
+                    Picker(selection: switchKeyBinding) {
+                        ForEach(SwitchWheelKey.presets) { Text($0.label).tag($0) }
+                    } label: {
+                        Text("呼出键")
+                            .help("⌥` 别选：PortManager 的轮盘占着它。⌥Space 被 Gemini 抢、双击 ⌥ 被 Claude 桌面版占，都不在这个列表里。")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            } header: {
+                Text("三向甩")
             }
 
             Section {

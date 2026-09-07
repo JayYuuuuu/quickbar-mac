@@ -50,12 +50,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         PanelService.shared.startWatchingPanelSize()
         // Finder 里选中商品文件夹 → 旁边浮一颗「主图丢进 PS」（只在 Finder 在前台时才有定时器）
         MainImagesPill.shared.start()
+        // 三向甩要记「每一类你上次在的是哪个窗口」，所以从开机就得跟着（只是听激活通知，没有轮询）。
+        WindowSwitch.shared.start()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }
         // 「人动了」→ 药丸才去问访达选中了什么（见 MainImagesPill.noteUserInput）。
         // 装在这儿而不是 MainImagesPill.start() 里，是因为 tap 的回调应该只有一个主人。
         EventTapService.shared.onUserInput = { MainImagesPill.shared.noteUserInput() }
         EventTapService.shared.onJumpToFinder = { [weak self] in self?.jumpToFinder() }
+        // 三向甩（默认 ⌥Tab）：见 UI/SwitchWheel.swift
+        EventTapService.shared.onSwitchWheelShow = { SwitchWheel.shared.show() }
+        EventTapService.shared.onSwitchWheelCommit = { SwitchWheel.shared.commit() }
+        EventTapService.shared.onSwitchWheelCancel = { SwitchWheel.shared.cancel() }
+        EventTapService.shared.onSwitchWheelDirection = { SwitchWheel.shared.select($0) }
 
         if Permissions.allGranted {
             EventTapService.shared.start()
