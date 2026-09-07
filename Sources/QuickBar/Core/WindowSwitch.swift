@@ -29,9 +29,22 @@ enum SwitchLane: Int, CaseIterable {
     }
 }
 
-/// 甩过去要落到哪个进程上。
+/// 甩过去要落到哪儿。
+///
+/// 🔴 **落点不都是「一个进程」**，这是二级展开逼出来的：访达一个进程开着好几个窗口、
+/// WPS 一个窗口里塞着好几个文档（它用标签页）。三种落点各有各的切法，见 `WindowSwitch.activate`。
 struct SwitchTarget {
+    enum Action: Equatable {
+        /// 切到这个进程，落在它最前那个窗口上。
+        case app
+        /// 切到这个进程的第 N 个窗口（访达开好几个文件夹窗口时用）。
+        case window(index: Int)
+        /// 点这个应用「窗口」菜单里的那一项 —— WPS 那种标签页只能这么切（实测）。
+        case document(menuTitle: String)
+    }
+
     let pid: pid_t
+    var action: Action = .app
     let appName: String
     let icon: NSImage?
     /// 窗口标题（异步补上）。5 个 Chrome 图标一模一样，**只有它能区分**，
@@ -199,11 +212,126 @@ final class WindowSwitch {
         return out
     }
 
-    private func make(_ app: NSRunningApplication) -> SwitchTarget {
+    private func make(_ app: NSRunningApplication, action: SwitchTarget.Action = .app) -> SwitchTarget {
         SwitchTarget(pid: app.processIdentifier,
+                     action: action,
                      appName: app.localizedName ?? "应用",
                      icon: app.icon,
                      windowTitle: nil)
+    }
+
+    // MARK: - 一格里的全部成员（停住展开时才算）
+
+    /// 这一类里所有能去的地方，最近用过的排前面。
+    ///
+    /// 🔴 **这条路慢，只在人停住手要展开时才走** —— 它要枚举 AX 窗口、还要读 WPS 的「窗口」菜单，
+    /// 都是跨进程 IPC。弹出那一路上一步都不能碰它（那条的全部价值是「按下就在」）。
+    ///
+    /// 三类各有各的展开口径，都是量出来的：
+    /// - **浏览器**：一个实例一个进程（多 profile），所以按进程列，每个挂上店名。
+    /// - **访达**：一个进程好几个窗口，所以按 AX 窗口列。实测 raise 第 2 个窗口之后
+    ///   窗口顺序真的翻了 —— AX 的窗口数组就是 z 序。
+    /// - **文档**：WPS 用标签页，两个文档只有一个 AX 窗口，但它的**「窗口」菜单**里两个都列着。
+    ///   实测点那一项能切过去（qb.docx → qa.docx）。这是所有多文档应用的通用约定，
+    ///   不用给 WPS 写特例；菜单里没有文档项的应用就退回按进程列。
+    nonisolated static func members(of lane: SwitchLane, apps: [(pid: pid_t, name: String, icon: NSImage?)]) -> [SwitchTarget] {
+        var out: [SwitchTarget] = []
+        for app in apps {
+            switch lane {
+            case .browser:
+                var t = SwitchTarget(pid: app.pid, action: .app, appName: app.name, icon: app.icon)
+                t.windowTitle = windowTitle(pid: app.pid).map { trim($0, appName: app.name) }
+                t.badge = BrowserPorts.info(pid: app.pid)?.label
+                out.append(t)
+
+            case .finder:
+                let titles = windowTitles(pid: app.pid)
+                if titles.isEmpty {
+                    out.append(SwitchTarget(pid: app.pid, action: .app, appName: app.name, icon: app.icon))
+                }
+                for (i, title) in titles.enumerated() {
+                    var t = SwitchTarget(pid: app.pid, action: .window(index: i), appName: app.name, icon: app.icon)
+                    t.windowTitle = title
+                    out.append(t)
+                }
+
+            case .document:
+                let docs = documentMenuItems(pid: app.pid)
+                if docs.isEmpty {
+                    var t = SwitchTarget(pid: app.pid, action: .app, appName: app.name, icon: app.icon)
+                    t.windowTitle = windowTitle(pid: app.pid).map { trim($0, appName: app.name) }
+                    out.append(t)
+                }
+                for doc in docs {
+                    var t = SwitchTarget(pid: app.pid, action: .document(menuTitle: doc.raw),
+                                         appName: app.name, icon: app.icon)
+                    t.windowTitle = doc.shown
+                    t.badge = app.name
+                    out.append(t)
+                }
+            }
+        }
+        return out
+    }
+
+    /// 一个进程的所有窗口标题，按 AX 的顺序（= z 序，最前的在最前面）。
+    nonisolated static func windowTitles(pid: pid_t) -> [String] {
+        let ax = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(ax, 0.4)
+        return AX.elements(ax, kAXWindowsAttribute as String).compactMap {
+            let t = AX.string($0, kAXTitleAttribute as String)
+            return (t?.isEmpty ?? true) ? nil : t
+        }
+    }
+
+    /// 「窗口」菜单最底下那批文档项。
+    ///
+    /// 🔴 **认它们靠「在最后一条分隔线之后」**，不靠名字 —— 上面那些是「水平平铺」「层叠」
+    /// 这类命令，各家应用各不相同，写死名单一定漏。菜单项名字前面还挂着序号（`1 qa.docx`），
+    /// 点的时候要用带序号的原名，显示时才把它去掉。
+    nonisolated static func documentMenuItems(pid: pid_t) -> [(raw: String, shown: String)] {
+        let ax = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(ax, 0.6)
+        guard let bar = AX.element(ax, kAXMenuBarAttribute as String) else { return [] }
+
+        // 「窗口」菜单：中文系统叫「窗口」，英文的叫 Window。
+        let names = ["窗口", "Window", "视窗"]
+        var menu: AXUIElement?
+        for item in AX.elements(bar, kAXChildrenAttribute as String) {
+            guard let title = AX.string(item, kAXTitleAttribute as String), names.contains(title) else { continue }
+            menu = AX.elements(item, kAXChildrenAttribute as String).first
+            break
+        }
+        guard let menu else { return [] }
+
+        var afterSeparator: [(String, String)] = []
+        for item in AX.elements(menu, kAXChildrenAttribute as String) {
+            let title = AX.string(item, kAXTitleAttribute as String)
+            guard let title, !title.isEmpty else {          // 分隔线没有标题
+                afterSeparator.removeAll()
+                continue
+            }
+            // 去掉前面那个序号：「1 qa.docx」→「qa.docx」
+            var shown = title
+            if let space = title.firstIndex(of: " "),
+               Int(title[title.startIndex..<space]) != nil {
+                shown = String(title[title.index(after: space)...])
+            }
+            // 服务端读到的目录名和访达呈现的可能差一次归一化，这里只取最后一段做显示。
+            if shown.hasPrefix("/") { shown = (shown as NSString).lastPathComponent }
+            afterSeparator.append((title, shown))
+        }
+        // 只有两个以上才值得展开 —— 一个的时候展开跟不展开是同一件事。
+        return afterSeparator.count >= 2 ? afterSeparator.map { (raw: $0.0, shown: $0.1) } : []
+    }
+
+    /// 这一类里所有活着的应用，MRU 顺序。
+    func apps(of lane: SwitchLane) -> [(pid: pid_t, name: String, icon: NSImage?)] {
+        var list = liveApps().filter { Self.lane(of: $0) == lane }
+        if lane == .document, list.isEmpty {
+            list = liveApps().filter { Self.lane(of: $0) == nil }
+        }
+        return list.map { ($0.processIdentifier, $0.localizedName ?? "应用", $0.icon) }
     }
 
     // MARK: - 窗口标题（后台读，别挡住弹出）
@@ -235,6 +363,57 @@ final class WindowSwitch {
     /// `NSRunningApplication` 那套按 bundle id 找「第一个」，5 个 Chrome 里永远挑同一个；
     /// 而 `AXFrontmost` 是对着 pid 说话的，实测两次都精确切到了指定的那一个实例。
     /// 底下那几行是防「AX 恰好不灵」的保险，不影响主路。
+    /// 按落点的类型分三条路走。
+    static func activate(_ target: SwitchTarget) {
+        switch target.action {
+        case .app:
+            activate(pid: target.pid)
+        case .window(let index):
+            activate(pid: target.pid, windowIndex: index)
+        case .document(let menuTitle):
+            activate(pid: target.pid, menuTitle: menuTitle)
+        }
+    }
+
+    /// 访达那种一个进程好几个窗口：raise 指定那个再把应用带到前台。
+    /// 顺序不能反 —— 先 frontmost 的话人会先看到**上一个**窗口闪一下。
+    static func activate(pid: pid_t, windowIndex: Int) {
+        DispatchQueue.global(qos: .userInteractive).async {
+            let ax = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(ax, 0.5)
+            let windows = AX.elements(ax, kAXWindowsAttribute as String)
+            if windowIndex < windows.count {
+                AXUIElementPerformAction(windows[windowIndex], kAXRaiseAction as CFString)
+            }
+            AXUIElementSetAttributeValue(ax, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+            DispatchQueue.main.async {
+                guard let app = NSRunningApplication(processIdentifier: pid), !app.isActive else { return }
+                app.activate(options: [.activateAllWindows])
+            }
+        }
+    }
+
+    /// WPS 那种标签页：点它「窗口」菜单里的那一项。
+    /// 🔴 **要先把应用带到前台再点** —— 菜单栏是前台应用那份，不在前台时点不到。
+    static func activate(pid: pid_t, menuTitle: String) {
+        activate(pid: pid)
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.25) {
+            let ax = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(ax, 0.6)
+            guard let bar = AX.element(ax, kAXMenuBarAttribute as String) else { return }
+            let names = ["窗口", "Window", "视窗"]
+            for item in AX.elements(bar, kAXChildrenAttribute as String) {
+                guard let t = AX.string(item, kAXTitleAttribute as String), names.contains(t),
+                      let menu = AX.elements(item, kAXChildrenAttribute as String).first else { continue }
+                for entry in AX.elements(menu, kAXChildrenAttribute as String)
+                where AX.string(entry, kAXTitleAttribute as String) == menuTitle {
+                    AXUIElementPerformAction(entry, kAXPressAction as CFString)
+                    return
+                }
+            }
+        }
+    }
+
     static func activate(pid: pid_t) {
         let app = NSRunningApplication(processIdentifier: pid)
         app?.unhide()

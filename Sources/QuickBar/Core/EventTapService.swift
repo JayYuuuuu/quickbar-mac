@@ -21,8 +21,10 @@ final class EventTapService {
     var onSwitchWheelShow: (() -> Void)?
     var onSwitchWheelCommit: (() -> Void)?
     var onSwitchWheelCancel: (() -> Void)?
-    /// 按住修饰键时用 ←↑→ 选方向（`nil` = 回到「取消」）。手在键盘上时鼠标够不着。
-    var onSwitchWheelDirection: ((SwitchLane?) -> Void)?
+    /// 按住修饰键时按了方向键。手在键盘上时鼠标够不着，这条是主场景里的必需品。
+    /// **传原始方向而不是「哪一格」** —— 摊开之后 ↑↓ 是在列表里走、← 是收回，
+    /// 跟三格态下的含义完全不同，翻译成格子会把这层区别丢掉。
+    var onSwitchWheelDirection: ((Keyboard.SwitchArrow) -> Void)?
 
     /// 人敲了键或松开了鼠标。药丸拿它当「访达里的选中项可能变了」的信号 ——
     /// 见 `MainImagesPill.noteUserInput`。**这里不判断前台是谁**：那要读一次
@@ -177,7 +179,7 @@ final class EventTapService {
                 }
                 // ←↑→ 选方向，↓ 回到「取消」。都吞掉 —— 这会儿方向键属于这块浮窗。
                 if let arrow = Keyboard.switchArrow(keyCode) {
-                    DispatchQueue.main.async { [weak self] in self?.onSwitchWheelDirection?(arrow.lane) }
+                    DispatchQueue.main.async { [weak self] in self?.onSwitchWheelDirection?(arrow) }
                     return nil
                 }
             }

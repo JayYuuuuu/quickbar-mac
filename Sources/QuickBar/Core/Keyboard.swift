@@ -12,23 +12,28 @@ enum Keyboard {
     static let arrowDown: CGKeyCode = 125
     static let arrowUp: CGKeyCode = 126
 
-    /// 三向甩：方向键指向哪一格。`nil` = 这个键跟三向甩无关，`.cancel` = 回到「取消」。
+    /// 三向甩按了哪个方向键。**保留原始方向**：三格态下它对应某一格，
+    /// 摊开之后 ↑↓ 是在列表里走、← 是收回 —— 两套含义，翻译成格子就丢了。
     enum SwitchArrow {
-        case lane(SwitchLane)
-        case cancel
+        case left, up, right, down
 
+        /// 三格态下这个方向对应哪一格（↓ 没有对应的格子 = 回到「取消」）。
         var lane: SwitchLane? {
-            if case .lane(let l) = self { return l }
-            return nil
+            switch self {
+            case .left: return .browser
+            case .up: return .document
+            case .right: return .finder
+            case .down: return nil
+            }
         }
     }
 
     static func switchArrow(_ keyCode: CGKeyCode) -> SwitchArrow? {
         switch keyCode {
-        case arrowLeft: return .lane(.browser)
-        case arrowUp: return .lane(.document)
-        case arrowRight: return .lane(.finder)
-        case arrowDown: return .cancel
+        case arrowLeft: return .left
+        case arrowUp: return .up
+        case arrowRight: return .right
+        case arrowDown: return .down
         default: return nil
         }
     }

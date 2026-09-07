@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         EventTapService.shared.onSwitchWheelShow = { SwitchWheel.shared.show() }
         EventTapService.shared.onSwitchWheelCommit = { SwitchWheel.shared.commit() }
         EventTapService.shared.onSwitchWheelCancel = { SwitchWheel.shared.cancel() }
-        EventTapService.shared.onSwitchWheelDirection = { SwitchWheel.shared.select($0) }
+        EventTapService.shared.onSwitchWheelDirection = { SwitchWheel.shared.press($0) }
 
         if Permissions.allGranted {
             EventTapService.shared.start()

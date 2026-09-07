@@ -24,6 +24,20 @@ final class SwitchWheel {
     /// 鼠标判定当场抹掉（手在键盘上时鼠标停在中心，算出来永远是「取消」）。
     private var lastMouse: CGPoint?
 
+    // 展开态（甩到一格停住不松手，那一类摊开成一列）
+    private var expandedLane: SwitchLane?
+    private var members: [SwitchTarget] = []
+    private var memberIndex = 0
+    /// 展开之后判定用的原点 = 第一行的中心。
+    private var listOrigin = CGPoint.zero
+    /// 手停在当前这一格上多久了。
+    private var hoverSince = CFAbsoluteTimeGetCurrent()
+    /// 正在后台取成员的那一格，别重复发。
+    private var expanding: SwitchLane?
+
+    /// 停多久才摊开。太短会「只是路过也弹一堆东西出来」，太长人以为它不支持。
+    private static let expandDelay: CFTimeInterval = 0.45
+
     private init() {}
 
     var isShowing: Bool { panel?.isVisible == true }
@@ -37,6 +51,11 @@ final class SwitchWheel {
 
         targets = WindowSwitch.shared.targets()
         selected = nil
+        expandedLane = nil
+        members = []
+        memberIndex = 0
+        expanding = nil
+        hoverSince = CFAbsoluteTimeGetCurrent()
 
         let panel = ensurePanel()
         // 面板按 anchor（「取消」块的中心）摆到鼠标上，不是按面板中心 —— 理由见 WheelGeo.anchor。
@@ -58,12 +77,21 @@ final class SwitchWheel {
     func commit() {
         guard isShowing else { return }
         let lane = selected
+        let expanded = expandedLane
+        let picked = members.indices.contains(memberIndex) ? members[memberIndex] : nil
         hide()
-        guard let lane else { return }
 
+        // 摊开着的时候，选的是那一列里的某一行，不是格子本身。
+        if let expanded, let picked {
+            Notify.log("三向甩✓ 摊开的 \(expanded.title) 里选了 \(picked.badge ?? "—")：\(picked.label)(\(picked.pid))")
+            WindowSwitch.activate(picked)
+            return
+        }
+
+        guard let lane else { return }
         if let target = targets[lane] {
             Notify.log("三向甩✓ 切到 \(target.caption(lane))：\(target.label)(\(target.pid))")
-            WindowSwitch.activate(pid: target.pid)
+            WindowSwitch.activate(target)
         } else if lane == .finder {
             // 访达一个窗口都没开也要给人开一个，否则就是「甩了没反应」。
             WindowSwitch.activateFinder()
@@ -94,12 +122,97 @@ final class SwitchWheel {
     private func tick() {
         guard isShowing else { return }
         let mouse = NSEvent.mouseLocation
-        if let last = lastMouse, abs(last.x - mouse.x) < 1, abs(last.y - mouse.y) < 1 { return }
+        let moved = lastMouse.map { abs($0.x - mouse.x) >= 1 || abs($0.y - mouse.y) >= 1 } ?? true
+        if moved { lastMouse = mouse }
+
+        // 摊开着：上下选行；横向移出去就当人改主意了，收回三格。
+        if let lane = expandedLane {
+            guard moved else { return }
+            if ListGeo.leftList(mouse, center: listOrigin) {
+                collapse(back: lane)
+                return
+            }
+            let i = ListGeo.index(at: mouse, center: listOrigin, count: members.count)
+            guard i != memberIndex else { return }
+            memberIndex = i
+            view?.update(lane: lane, members: members, index: i)
+            return
+        }
+
+        if moved {
+            let lane = WheelGeo.lane(at: mouse, center: origin)
+            if lane != selected {
+                selected = lane
+                hoverSince = CFAbsoluteTimeGetCurrent()
+                view?.update(targets: targets, selected: lane)
+            }
+        }
+
+        // 停住不动够久 → 把这一类摊开。
+        if let lane = selected, expanding == nil,
+           CFAbsoluteTimeGetCurrent() - hoverSince > Self.expandDelay {
+            beginExpand(lane)
+        }
+    }
+
+    // MARK: - 摊开 / 收回
+
+    /// 🔴 **成员列表在后台读**：要枚举 AX 窗口、还要读「窗口」菜单，都是跨进程 IPC。
+    /// 读完回来才换版式；这中间人要是把手移开了，就当没发生过。
+    private func beginExpand(_ lane: SwitchLane) {
+        expanding = lane
+        let myRound = round
+        let apps = WindowSwitch.shared.apps(of: lane)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let list = WindowSwitch.members(of: lane, apps: apps)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.round == myRound, self.isShowing,
+                          self.selected == lane, self.expandedLane == nil else { return }
+                    // 只有一个成员时摊开跟不摊开是同一件事，别白闪一下。
+                    guard list.count >= 2 else { return }
+                    self.showList(lane, list)
+                }
+            }
+        }
+    }
+
+    private func showList(_ lane: SwitchLane, _ list: [SwitchTarget]) {
+        members = list
+        memberIndex = 0
+        expandedLane = lane
+
+        // 第一行落在鼠标现在这儿 —— 手不动选的还是原来那个，往下移才是第二个。
+        let mouse = NSEvent.mouseLocation
+        let size = ListGeo.panelSize(list.count)
+        let anchor = ListGeo.anchor(list.count)
+        let frame = clamp(NSRect(x: mouse.x - anchor.x, y: mouse.y - anchor.y,
+                                 width: size.width, height: size.height), near: mouse)
+        listOrigin = CGPoint(x: frame.minX + anchor.x, y: frame.minY + anchor.y)
         lastMouse = mouse
-        let lane = WheelGeo.lane(at: mouse, center: origin)
-        guard lane != selected else { return }
-        selected = lane
-        view?.update(targets: targets, selected: lane)
+        panel?.setFrame(frame, display: true)
+        view?.update(lane: lane, members: list, index: 0)
+        Notify.log("三向甩▸ 摊开 \(lane.title) \(list.count) 个：" +
+                   list.prefix(6).map { "\($0.badge ?? "—")/\($0.label)" }.joined(separator: " | "))
+    }
+
+    private func collapse(back lane: SwitchLane) {
+        expandedLane = nil
+        members = []
+        memberIndex = 0
+        // 收回之后允许再摊开一次 —— 人横向甩出去往往只是想换一格。
+        expanding = nil
+        hoverSince = CFAbsoluteTimeGetCurrent()
+
+        let mouse = NSEvent.mouseLocation
+        let anchor = WheelGeo.anchor
+        let frame = clamp(NSRect(x: mouse.x - anchor.x, y: mouse.y - anchor.y,
+                                 width: WheelGeo.panelSize.width, height: WheelGeo.panelSize.height),
+                          near: mouse)
+        origin = CGPoint(x: frame.minX + anchor.x, y: frame.minY + anchor.y)
+        selected = WheelGeo.lane(at: mouse, center: origin)
+        panel?.setFrame(frame, display: true)
+        view?.update(targets: targets, selected: selected)
     }
 
     /// 方向键也能选。
@@ -107,10 +220,22 @@ final class SwitchWheel {
     /// 🔴 **这条不是锦上添花**：主场景是「文档里 ⌘C 复制，切到浏览器 ⌘V 粘贴」——
     /// 按 ⌘C 的时候两只手都在键盘上，鼠标离得远。只有鼠标能选的话，这个功能在它
     /// 最该派上用场的那一刻正好用不了。
-    func select(_ lane: SwitchLane?) {
+    func press(_ arrow: Keyboard.SwitchArrow) {
         guard isShowing else { return }
-        selected = lane
-        view?.update(targets: targets, selected: lane)
+        // 摊开着的时候方向键换意思：↑↓ 在列表里走，← 收回三格。
+        if let expanded = expandedLane {
+            switch arrow {
+            case .up: memberIndex = max(memberIndex - 1, 0)
+            case .down: memberIndex = min(memberIndex + 1, max(members.count - 1, 0))
+            case .left: collapse(back: expanded); return
+            case .right: return
+            }
+            view?.update(lane: expanded, members: members, index: memberIndex)
+            return
+        }
+        selected = arrow.lane
+        hoverSince = CFAbsoluteTimeGetCurrent()
+        view?.update(targets: targets, selected: selected)
     }
 
     // MARK: - 标题
@@ -251,6 +376,46 @@ enum WheelGeo {
     }
 }
 
+/// 展开之后那一列的版式和判定。跟 `WheelGeo` 一样，**两件事在同一处算**。
+enum ListGeo {
+    static let width: CGFloat = 460
+    static let rowH: CGFloat = 36
+    static let headerH: CGFloat = 26
+    static let pad: CGFloat = 8
+    /// 再多就超出屏幕了，而且十几行也不是「甩一下」该干的事。
+    static let maxRows = 12
+
+    static func rows(_ count: Int) -> Int { min(max(count, 1), maxRows) }
+
+    static func panelSize(_ count: Int) -> CGSize {
+        CGSize(width: width, height: pad * 2 + headerH + CGFloat(rows(count)) * rowH)
+    }
+
+    /// 🔴 **anchor 是第一行的中心**，也就是「展开那一刻鼠标在哪」。
+    /// 这样展开**不改变默认选中的是谁** —— 手不动还是那一类里最近的那个，
+    /// 往下移才是第二个、第三个。展开只是把更多选项排在下面，不是换了一套东西。
+    static func anchor(_ count: Int) -> CGPoint {
+        CGPoint(x: width / 2, y: panelSize(count).height - pad - headerH - rowH / 2)
+    }
+
+    static func rowRect(_ index: Int, count: Int) -> CGRect {
+        let h = panelSize(count).height
+        return CGRect(x: pad, y: h - pad - headerH - CGFloat(index + 1) * rowH,
+                      width: width - pad * 2, height: rowH)
+    }
+
+    /// 屏幕坐标 → 第几行。`center` 是 anchor 落在屏幕上的那个点。
+    static func index(at p: CGPoint, center: CGPoint, count: Int) -> Int {
+        let steps = Int(((center.y - p.y) / rowH).rounded())
+        return min(max(steps, 0), max(count - 1, 0))
+    }
+
+    /// 横向移出这么远就当人改主意了，收回三格。
+    static func leftList(_ p: CGPoint, center: CGPoint) -> Bool {
+        abs(p.x - center.x) > width / 2 + 60
+    }
+}
+
 // MARK: - 画
 
 private final class WheelView: NSView {
@@ -264,6 +429,9 @@ private final class WheelView: NSView {
     ///    是同一个坑的第二个版本：**顺序只由子视图数组说了算**，所以画的那半
     ///    必须是排在 `backdrop` 之后的另一个子视图。
     private let paint = CellsView()
+    /// 展开之后那一列。跟三格是两块视图，靠 `hidden` 换 —— 同一块视图画两种版式，
+    /// 迟早会在某个状态下画串。
+    private let listPaint = ListView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -278,9 +446,12 @@ private final class WheelView: NSView {
         backdrop.autoresizingMask = [.width, .height]
         addSubview(backdrop)
 
-        paint.frame = bounds
-        paint.autoresizingMask = [.width, .height]
-        addSubview(paint)
+        for v in [paint as NSView, listPaint as NSView] {
+            v.frame = bounds
+            v.autoresizingMask = [.width, .height]
+            addSubview(v)
+        }
+        listPaint.isHidden = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -288,9 +459,88 @@ private final class WheelView: NSView {
     override var isFlipped: Bool { false }
 
     func update(targets: [SwitchLane: SwitchTarget], selected: SwitchLane?) {
+        paint.isHidden = false
+        listPaint.isHidden = true
         paint.targets = targets
         paint.selected = selected
         paint.needsDisplay = true
+    }
+
+    func update(lane: SwitchLane, members: [SwitchTarget], index: Int) {
+        paint.isHidden = true
+        listPaint.isHidden = false
+        listPaint.lane = lane
+        listPaint.members = members
+        listPaint.index = index
+        listPaint.needsDisplay = true
+    }
+}
+
+/// 展开之后那一列：一行一个落点。
+private final class ListView: NSView {
+
+    var lane: SwitchLane = .browser
+    var members: [SwitchTarget] = []
+    var index = 0
+
+    override var isFlipped: Bool { false }
+
+    /// 🔴 **那一列只在它能区分行与行的时候才存在。** 访达的窗口没有店名，
+    /// 一整列「—」白占 76pt 还把文件夹名挤到右边去；同一个 WPS 里的几个文档，
+    /// 那一列会是三个一模一样的「wpsoffice」。都是"有一列"比"没有"更糟。
+    private var showsBadge: Bool {
+        Set(members.map { $0.badge ?? "" }).count > 1
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let count = ListGeo.rows(members.count)
+        let title = "\(lane.title) · \(members.count) 个"
+        drawText(title,
+                 in: NSRect(x: ListGeo.pad + 12, y: bounds.height - ListGeo.pad - 20,
+                            width: bounds.width - ListGeo.pad * 2 - 24, height: 16),
+                 font: .systemFont(ofSize: 11, weight: .medium), color: .secondaryLabelColor)
+
+        for i in 0..<count {
+            let r = ListGeo.rowRect(i, count: members.count)
+            let m = members[i]
+            let on = i == index
+
+            if on {
+                NSColor.controlAccentColor.setFill()
+                NSBezierPath(roundedRect: r.insetBy(dx: 0, dy: 1), xRadius: 8, yRadius: 8).fill()
+            }
+
+            var x = r.minX + 10
+            if let icon = m.icon {
+                icon.draw(in: NSRect(x: x, y: r.midY - 9, width: 18, height: 18),
+                          from: .zero, operation: .sourceOver, fraction: 1,
+                          respectFlipped: true, hints: nil)
+            }
+            x += 18 + 9
+
+            // 店名那一列固定宽度，好让眼睛顺着一条竖线往下扫 —— 那一列才是人真正在找的东西。
+            if showsBadge {
+                let badgeW: CGFloat = 76
+                drawText(m.badge ?? "—",
+                         in: NSRect(x: x, y: r.midY - 8, width: badgeW, height: 16),
+                         font: .systemFont(ofSize: 12, weight: .semibold),
+                         color: on ? .white : .labelColor)
+                x += badgeW + 10
+            }
+
+            drawText(m.label,
+                     in: NSRect(x: x, y: r.midY - 8, width: r.maxX - 10 - x, height: 16),
+                     font: .systemFont(ofSize: 12, weight: showsBadge ? .regular : .medium),
+                     color: on ? .white : .labelColor)
+        }
+    }
+
+    private func drawText(_ text: String, in rect: NSRect, font: NSFont, color: NSColor) {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byTruncatingTail
+        (text as NSString).draw(in: rect, withAttributes: [
+            .font: font, .foregroundColor: color, .paragraphStyle: style,
+        ])
     }
 }
 
