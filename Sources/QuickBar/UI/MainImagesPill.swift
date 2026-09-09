@@ -2,7 +2,7 @@ import AppKit
 
 /// 去水印那道工序两头的那颗小药丸。同一颗，看你人在哪儿：
 ///
-/// · **在 Finder 里**选中了商品文件夹 → 「主图丢进 PS · 3 件 6 张」，点一下全打开；
+/// · **在 Finder 里**选中了图片或商品文件夹 → 「图丢进 PS · 6 张」/「主图丢进 PS · 3 件 6 张」，点一下全打开；
 /// · **在 Photoshop 里**还有没存回的图 → 「存回原位 · 还剩 12 张」，点一下把当前这张
 ///   拼合、按原路径覆盖存回、关掉（见 Core/Photoshop.swift）。
 ///
@@ -13,7 +13,7 @@ import AppKit
 /// 这里只管**什么时候出现、贴在哪儿、点下去干什么**。
 ///
 /// 【只在"点了真的有事发生"的时候出现】Finder 那头的显示条件不是"在素材目录里"，而是
-/// **选中的东西真的解析出了主图**（`MainImages.collect` 说有几张就是几张）；
+/// **选中的东西真的解析出了图**（`MainImages.pick` 说有几张就是几张）；
 /// PS 那头是**PS 里现在有能存回的图**（`Photoshop.remaining > 0`，向 PS 校准过的真实数，
 /// 不管这张图是经药丸丢进去的还是人自己打开的）。
 /// 🔴 有意不加"必须在 `_采集` 树下"这种路径闸门：素材被复制到别处照样能用，
@@ -60,6 +60,8 @@ final class MainImagesPill {
     private static let reArm: TimeInterval = 20
     /// 当前这组选中项对应的主图（点下去就开这些的父级路径）。
     private var pending: [String] = []
+    /// 药丸浮出来那一发用的是不是「人真的选中了」——点下去要按同一个口径挑图。
+    private var pendingLoose = false
     private var mode: Mode = .finder
     /// 药丸上现在写着什么。用来判「要不要重画」。
     private var shownTitle = ""
@@ -334,37 +336,49 @@ final class MainImagesPill {
         //    （2026-08-24 实测，白查了一轮）。它不是线程安全的，AE 的权限判定同理。
         //    代价是每 1.5 秒一次几十毫秒的主线程占用，而且**只在 Finder 在最前时**发生；
         //    真正重的那半（数图 = readdir，素材盘是 SMB）仍然留在后台队列。
-        let paths = FinderService.shared.selectionNow()
+        let sel = FinderService.shared.selectionNow()
+        let paths = sel.paths
         if paths == lastSelection { return }      // 选中项没变 → 连图都不用数
         lastSelection = paths
         guard !paths.isEmpty else { hide(); return }
         let acted = actedSelection
+        // 🔴 **只有人真的选中了，普通文件夹里的图才算数。** 什么都没选时访达给的是当前窗口
+        //    所在的目录，放开这一条的话，随便打开一个有图的文件夹药丸就浮出来 ——
+        //    那是浏览，不是要处理。商品文件夹那几条口径不受影响（人进到那儿就是要修图）。
+        let loose = sel.picked
         probing = true
         probe.async { [weak self] in
-            let images = MainImages.collect(from: Array(paths.prefix(200)))
-            // 🔴 数「几件」要往上跳**两层**：图在 `<商品>/主图/` 和 `<商品>/主图1比1/` 里，
-            //    只跳一层数出来的是子目录数（每件两个），写在药丸上就成了件数翻倍。
-            let products = Set(images.map {
-                $0.deletingLastPathComponent().deletingLastPathComponent().path
-            }).count
+            let picked = MainImages.pick(from: Array(paths.prefix(200)), allowLooseFolder: loose)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.probing = false
                 guard self.mode == .finder else { return }
-                guard !images.isEmpty, paths != acted else { self.hide(); return }
+                guard !picked.isEmpty, paths != acted else { self.hide(); return }
                 // 🔴 **选中项已经换成别的了 → 防重复那条使命完成，当场清掉。**
                 //    不清的话它会一直记着那一组路径：你切去别的文件夹、再切回来，
                 //    照样撞上，药丸对那个文件夹**永远不出来**（2026-08-25 用户实测）。
                 //    而「PS 里正开着它的图、回头再丢一次」恰恰是常事。
                 self.actedSelection = []
                 self.pending = paths
+                self.pendingLoose = loose
+                let n = picked.images.count
+                // 🔴 **认出是采集素材才说「主图」。** 对着几张随手选的图说「主图 · 1 件 2 张」，
+                //    人会以为它在按某种猜不到的规矩挑图，于是根本不敢拿它开普通图片
+                //    —— 2026-09-09 用户就是这么以为的，而这个能力其实一直都在。
                 // 一件商品开两张（3 比 4 一张、1 比 1 一张），所以「几件」和「几张」都得写；
-                // 只选中一件、或者只选中单张图时两个数一样，那就只写张数。
-                let title = images.count == products
-                    ? "主图丢进 PS · \(images.count) 张"
-                    : "主图丢进 PS · \(products) 件 \(images.count) 张"
+                // 只选中一件时两个数一样，那就只写张数。
+                let title: String
+                if picked.isMainImages {
+                    title = n == picked.products
+                        ? "主图丢进 PS · \(n) 张"
+                        : "主图丢进 PS · \(picked.products) 件 \(n) 张"
+                } else {
+                    title = "图丢进 PS · \(n) 张"
+                }
                 self.show(title: title, style: .action, fraction: 0,
-                          tip: "把选中的商品文件夹里的「主图」全部在 Photoshop 里打开。"
+                          tip: (picked.isMainImages
+                                ? "把选中的商品文件夹里的「主图」全部在 Photoshop 里打开。"
+                                : "把选中的这 \(n) 张图在 Photoshop 里打开（文件夹只看这一层，不往下找）。")
                              + "不想要它浮出来：设置 → 素材批次里关掉。")
             }
         }
@@ -518,12 +532,15 @@ final class MainImagesPill {
             //    数量对不上也不危险：`openInPhotoshop` 超过 30 张本来就会再问一声。
             //    拿不到（访达一个窗口都没有）才退回药丸上那组，绝不让这一下"没反应"。
             let fresh = FinderService.shared.selectionNow()
-            let paths = fresh.isEmpty ? pending : fresh
+            let stale = fresh.paths.isEmpty
+            let paths = stale ? pending : fresh.paths
             actedSelection = paths
             actedAt = Date()
             lastSelection = paths
             hide()
-            MainImages.openInPhotoshop(paths)
+            // 「普通文件夹里的图算不算」要跟药丸浮出来时那一发保持一致，
+            // 否则点下去挑出来的东西跟药丸上写的数对不上。
+            MainImages.openInPhotoshop(paths, allowLooseFolder: stale ? pendingLoose : fresh.picked)
         case .photoshop:
             // 不 hide()：存回是有来有回的，药丸要留着显示「存回中…」和剩下几张。
             Photoshop.saveBackFront()

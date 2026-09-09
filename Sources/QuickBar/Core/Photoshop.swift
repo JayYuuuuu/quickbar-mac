@@ -237,7 +237,7 @@ enum Photoshop {
     /// 循环在脚本里跑，不是几十个来回 —— PS 每回一次都要它闲下来。
     static func saveBackAll() {
         guard isRunning else {
-            Notify.problem("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
+            Notify.problem("Photoshop 没在跑", "先把图丢进 PS，改完再来存回。")
             return
         }
         guard !busy else { return }
@@ -613,7 +613,7 @@ extension Photoshop {
                             "去「系统设置 → 隐私与安全性 → 自动化」，把 QuickBar 底下的 Photoshop 打开。")
                 NSWorkspace.shared.open(Permissions.Kind.automation.settingsURL)
             case -600, -609:
-                Notify.problem("Photoshop 没在跑", "先把主图丢进 PS，改完再来存回。")
+                Notify.problem("Photoshop 没在跑", "先把图丢进 PS，改完再来存回。")
             case -1712:
                 Notify.problem("Photoshop 没回话", "它多半正压着一个对话框。处理掉那个框再按一次。")
             default:

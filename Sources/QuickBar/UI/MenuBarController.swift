@@ -64,7 +64,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         //    「没找到 Photoshop」的菜单项，是把自己的实现细节摊给人看。
         if Permissions.isGranted(.automation),
            NSWorkspace.shared.urlForApplication(withBundleIdentifier: MainImages.photoshopBundleID) != nil {
-            let ps = item("主图丢进 PS", action: #selector(mainImagesToPhotoshop))
+            let ps = item("图丢进 PS", action: #selector(mainImagesToPhotoshop))
             ps.toolTip = "把 Finder 里选中的商品文件夹（或整批）的「主图」全部在 Photoshop 里打开。没选就用当前窗口那个文件夹。"
             menu.addItem(ps)
         }

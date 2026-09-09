@@ -82,8 +82,12 @@ final class FinderService {
     /// 🔴 不能用缓存的 `currentSelection`：那个只记「单个文件」、而且是 Finder 激活/失活时刷的。
     ///    「把选中的这几个商品文件夹丢进 PS」必须是**按下那一刻**的真实选择，差一步就开错东西。
     ///    代价是一次 AppleScript 往返（几十毫秒），点菜单时完全无感。
-    func selectionNow() -> [String] {
-        guard Permissions.isGranted(.automation) else { return [] }
+    /// - Returns: `picked` 为真表示这几条是**人真的选中的**；为假表示什么都没选中，
+    ///   给的是当前窗口所在的那个目录（一条）。
+    ///   🔴 **两者不能混为一谈**：药丸靠这个区分「要处理它」和「只是在浏览」——
+    ///   随便打开一个有图的文件夹就浮出来一颗按钮，那是打扰，不是帮忙。
+    func selectionNow() -> (paths: [String], picked: Bool) {
+        guard Permissions.isGranted(.automation) else { return ([], false) }
         let source = """
         tell application "Finder"
             if (count of Finder windows) = 0 then return ""
@@ -91,23 +95,26 @@ final class FinderService {
             set picked to selection
             if (count of picked) is 0 then
                 try
-                    set out to POSIX path of (target of front Finder window as alias)
+                    set out to "DIR" & linefeed & POSIX path of (target of front Finder window as alias)
                 end try
             else
+                set out to "SEL"
                 repeat with one in picked
-                    set out to out & POSIX path of (one as alias) & linefeed
+                    set out to out & linefeed & POSIX path of (one as alias)
                 end repeat
             end if
             return out
         end tell
         """
         var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return [] }
+        guard let script = NSAppleScript(source: source) else { return ([], false) }
         let result = script.executeAndReturnError(&error)
-        guard error == nil, let text = result.stringValue else { return [] }
-        return text.components(separatedBy: "\n")
+        guard error == nil, let text = result.stringValue else { return ([], false) }
+        let lines = text.components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+        guard let head = lines.first, head == "SEL" || head == "DIR" else { return ([], false) }
+        return (Array(lines.dropFirst()), head == "SEL")
     }
 
     /// 返回两行：第一行是最前窗口的目录，第二行是选中的单个项目（没有就空行）。

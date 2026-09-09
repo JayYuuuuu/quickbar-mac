@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         // 去水印那道工序的入口：Finder 里选中几个商品文件夹 → 主图全部在 PS 里打开（见 MainImages）
         menuBar?.onMainImagesToPhotoshop = {
-            MainImages.openInPhotoshop(FinderService.shared.selectionNow())
+            MainImages.openInPhotoshop(FinderService.shared.selectionNow().paths)
         }
         // 去水印的收尾：改完的那张按原路径覆盖存回（见 Core/Photoshop.swift）
         menuBar?.onSaveBackAll = { Photoshop.saveBackAll() }
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         MaterialFeed.shared.start()
         PanelService.shared.startWatchingPanelSize()
-        // Finder 里选中商品文件夹 → 旁边浮一颗「主图丢进 PS」（只在 Finder 在前台时才有定时器）
+        // Finder 里选中图片/商品文件夹 → 旁边浮一颗「图丢进 PS」（只在 Finder 在前台时才有定时器）
         MainImagesPill.shared.start()
         // 三向甩要记「每一类你上次在的是哪个窗口」，所以从开机就得跟着（只是听激活通知，没有轮询）。
         WindowSwitch.shared.start()

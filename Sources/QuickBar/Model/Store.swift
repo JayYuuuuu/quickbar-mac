@@ -169,7 +169,7 @@ struct Settings: Codable {
     /// 在家目录维护一个 `~/最近素材批次/`（里面是最近几批的替身，拖进 Finder 侧栏用）。
     /// 见 Core/BatchLinks.swift。
     var batchLinksEnabled: Bool = true
-    /// 在 Finder 里选中商品文件夹时，浮出一颗「主图丢进 PS」。见 UI/MainImagesPill.swift。
+    /// 在 Finder 里选中图片（或商品文件夹）时，浮出一颗「图丢进 PS」。见 UI/MainImagesPill.swift。
     var mainImagesPillEnabled: Bool = true
     /// 去水印那道工序的收尾：在 PS 里把当前这张按原路径覆盖存回并关掉。见 Core/Photoshop.swift。
     /// 一个开关同时管快捷键和那颗浮窗 —— 它们是同一件事的两个入口，分成两个只会多一处要解释的地方。

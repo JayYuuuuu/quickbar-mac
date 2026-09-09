@@ -646,11 +646,11 @@ private struct MaterialPane: View {
             // 设计稿 2b：去水印那两条单独成节 —— 它们跟上面「把批次放进快捷条」
             // 不是一回事，混在一张卡里读起来像同一组开关。
             Section {
-                Toggle("在 Finder 里选中商品文件夹时浮出「主图丢进 PS」", isOn: Binding(
+                Toggle("在 Finder 里选中图片时浮出「图丢进 PS」", isOn: Binding(
                     get: { store.settings.mainImagesPillEnabled },
                     set: { store.settings.mainImagesPillEnabled = $0; MainImagesPill.shared.reload() }
                 ))
-                .help("选中之后旁边浮一颗小按钮，点一下那几件的「主图」全部在 Photoshop 里打开（去水印那一步）。只在真的解析出主图时才出现；关掉之后菜单栏那一项照旧能用。")
+                .help("选中之后旁边浮一颗小按钮，点一下那些图全部在 Photoshop 里打开（去水印那一步）。选中的是采集下来的商品文件夹时，按那套结构只挑每件的主图首图。装着图的普通文件夹也认，但只看这一层、而且要真的选中它——只是打开着不算。只在真的解析出图时才出现；关掉之后菜单栏那一项照旧能用。")
 
                 Toggle(isOn: Binding(
                     get: { store.settings.psSaveBackEnabled },
