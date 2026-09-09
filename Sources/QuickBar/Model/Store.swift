@@ -184,6 +184,16 @@ struct Settings: Codable {
     var psSaveBackKeyCode: UInt16 = 113   // kVK_F15 = 0x71
     var psSaveBackModifierFlags: UInt = 0
 
+    /// 剪贴板里是一条 Mac 路径时，按 ⌘⇧G 直接在访达里打开它。见 Core/ClipboardJump.swift。
+    var clipboardJumpEnabled: Bool = true
+    /// 固定 **⌘⇧G**：那本来就是访达「前往文件夹」的键——人从网页复制完路径要按的就是它，
+    /// 只是现在不用先切到访达、也不用粘贴了。
+    /// 🔴 **别改成 ⌘G**：那是全系统的「查找下一个」，而人刚在网页上复制完路径、多半还在那页上翻。
+    /// ⌘⇧G 在别处是「查找上一个」，按的人少一个量级；何况只有剪贴板里真是路径时才拦。
+    var clipboardJumpKeyCode: UInt16 = 5    // kVK_ANSI_G
+    var clipboardJumpModifierFlags: UInt = UInt(CGEventFlags.maskCommand.rawValue
+                                                | CGEventFlags.maskShift.rawValue)
+
     /// 三向甩：按住 ⌥ 敲一下 Tab 浮出三格（浏览器 / 文档 / 访达），手往一个方向甩，松开 ⌥ 切过去。
     /// 见 UI/SwitchWheel.swift。
     var switchWheelEnabled: Bool = true
@@ -198,6 +208,7 @@ struct Settings: Codable {
     static let fixedKeys: Set<String> = [
         "jumpKeyCode", "jumpModifierFlags",
         "psSaveBackKeyCode", "psSaveBackModifierFlags",
+        "clipboardJumpKeyCode", "clipboardJumpModifierFlags",
     ]
 
     /// 记住的文件面板尺寸（全局一份）。

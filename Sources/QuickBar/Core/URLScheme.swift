@@ -81,9 +81,10 @@ enum URLScheme {
 
     // MARK: - 路径闸门
 
-    /// 只放行素材盘与用户家目录下的路径。`reveal` 和 `ps` 共用这一道闸门。
+    /// 只放行素材盘与用户家目录下的路径。`reveal`、`ps` 和剪贴板跳转共用这一道闸门 ——
+    /// **多一个入口就多一处能写松的地方**，所以判前缀这件事全项目只有这一份。
     ///`..` 先折平（`standardizedFileURL`）再判前缀，绕不过去。
-    private static func allowed(_ raw: String) -> URL? {
+    static func allowed(_ raw: String) -> URL? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains("\0") else { return nil }
         let expanded = (trimmed as NSString).expandingTildeInPath
@@ -96,11 +97,11 @@ enum URLScheme {
         return nil
     }
 
-    private static func exists(_ url: URL) -> Bool {
+    static func exists(_ url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.path)
     }
 
-    private static func isDir(_ url: URL) -> Bool {
+    static func isDir(_ url: URL) -> Bool {
         var flag: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &flag) && flag.boolValue
     }
@@ -113,7 +114,7 @@ enum URLScheme {
     }
 
     /// 往上找第一层还存在的目录（最多爬到 `/Volumes` 就停，别开到根目录去）。
-    private static func nearestExisting(_ url: URL) -> URL? {
+    static func nearestExisting(_ url: URL) -> URL? {
         var cur = url.deletingLastPathComponent()
         for _ in 0..<12 {
             let p = cur.path
@@ -126,7 +127,7 @@ enum URLScheme {
 
     // MARK: - 动作
 
-    private static func open(_ url: URL) {
+    static func open(_ url: URL) {
         if isDir(url) {
             Actions.openFolder(url.path)          // 复用当前 Finder 窗口（窗口尺寸不会跳）
         } else {

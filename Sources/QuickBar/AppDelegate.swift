@@ -52,11 +52,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         MainImagesPill.shared.start()
         // 三向甩要记「每一类你上次在的是哪个窗口」，所以从开机就得跟着（只是听激活通知，没有轮询）。
         WindowSwitch.shared.start()
+        // 开机后第一下 ⌘⇧G 之前可能一次输入事件都还没有，先把剪贴板看一眼。
+        ClipboardJump.reload()
 
         EventTapService.shared.onTrigger = { [weak self] _ in self?.quickBar?.toggle() }
-        // 「人动了」→ 药丸才去问访达选中了什么（见 MainImagesPill.noteUserInput）。
-        // 装在这儿而不是 MainImagesPill.start() 里，是因为 tap 的回调应该只有一个主人。
-        EventTapService.shared.onUserInput = { MainImagesPill.shared.noteUserInput() }
+        // 「人动了」→ 药丸才去问访达选中了什么（见 MainImagesPill.noteUserInput）；
+        // 剪贴板同理，它也只会被人的操作改变（见 ClipboardJump.noteUserInput）。
+        // 装在这儿而不是各自的 start() 里，是因为 tap 的回调应该只有一个主人。
+        EventTapService.shared.onUserInput = {
+            MainImagesPill.shared.noteUserInput()
+            ClipboardJump.noteUserInput()
+        }
         EventTapService.shared.onJumpToFinder = { [weak self] in self?.jumpToFinder() }
         // 三向甩（默认 ⌥Tab）：见 UI/SwitchWheel.swift
         EventTapService.shared.onSwitchWheelShow = { SwitchWheel.shared.show() }

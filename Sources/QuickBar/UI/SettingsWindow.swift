@@ -353,6 +353,15 @@ private struct ItemRow: View {
 // MARK: - 触发
 
 private struct TriggerPane: View {
+
+    /// 「打开剪贴板里那条路径」那个键长什么样。跟另外两个固定键一样改不了，
+    /// 但页面上必须写出来 —— 一个按不出来的快捷键等于没有。
+    private var clipboardJumpKey: String {
+        KeySymbols.describe(
+            flags: CGEventFlags(rawValue: UInt64(store.settings.clipboardJumpModifierFlags)),
+            keyCode: CGKeyCode(store.settings.clipboardJumpKeyCode))
+    }
+
     @ObservedObject var store: Store
 
     /// 设置里存的是键码 + 修饰键两个数，界面上是一个选择器，这里把两边接起来。
@@ -431,6 +440,18 @@ private struct TriggerPane: View {
             }
 
             Section {
+                Toggle(isOn: Binding(
+                    get: { store.settings.clipboardJumpEnabled },
+                    set: { store.settings.clipboardJumpEnabled = $0; ClipboardJump.reload() }
+                )) {
+                    Text("按 \(clipboardJumpKey) 打开剪贴板里那条路径")
+                        .help("网页上点完「复制路径」，在任何应用里按一下就跳过去了——不用先切到访达、再叫「前往文件夹」、再粘贴。只有剪贴板里确实是素材盘或家目录下的一条路径时才拦这个键；访达在最前时不拦（那儿它是「前往文件夹」，你可能想手打一条别的）。别处它是「查找上一个」，剪贴板里没路径就照旧归那个应用。")
+                }
+            } header: {
+                Text("剪贴板跳转")
+            }
+
+            Section {
                 LabeledContent("跳到 Finder 当前文件夹") {
                     Text(KeySymbols.describe(
                         flags: CGEventFlags(rawValue: UInt64(store.settings.jumpModifierFlags)),
@@ -454,7 +475,7 @@ private struct TriggerPane: View {
             } footer: {
                 Text("固定，不可修改")
                     .font(.system(size: 11.5)).foregroundStyle(.tertiary)
-                    .help("这两个键都只在特定场合才拦截（文件面板 / Photoshop 在最前），别处照旧是各应用自己的功能，所以没做成可改的。")
+                    .help("这几个键都只在特定场合才拦截（文件面板 / Photoshop 在最前 / 剪贴板里真是一条路径），别处照旧是各应用自己的功能，所以没做成可改的。")
             }
         }
         .formStyle(.grouped)

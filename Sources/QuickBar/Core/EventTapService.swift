@@ -195,6 +195,28 @@ final class EventTapService {
             return nil
         }
 
+        // 剪贴板里是一条 Mac 路径时，⌘⇧G 直接开访达（见 Core/ClipboardJump.swift）。
+        // 🔴 **这里绝不读剪贴板**：那是一次跨进程调用，而回调超时会被系统把整个 tap 关掉。
+        //    读的是主线程维护好的那个布尔。
+        // 🔴 **访达在最前时不接管**：那儿 ⌘⇧G 是「前往文件夹」，人可能正想手打一条别的路径。
+        //    （在回调里问一次前台是谁，跟下面 `Photoshop.isFrontmost` 是同一个先例；
+        //    这个分支只在键码对上时才走到，频率极低。）
+        if settings.clipboardJumpEnabled,
+           keyCode == CGKeyCode(settings.clipboardJumpKeyCode),
+           flags == CGEventFlags(rawValue: UInt64(settings.clipboardJumpModifierFlags))
+               .intersection(TriggerModifier.allFlags),
+           PanelService.shared.currentPanel() == nil,
+           NSWorkspace.shared.frontmostApplication?.bundleIdentifier != "com.apple.finder" {
+            if ClipboardJump.armed {
+                DispatchQueue.main.async { ClipboardJump.jump() }
+                return nil   // 吞掉
+            }
+            // 布尔是输入事件之后 120ms 才刷新的，人复制完立刻按可能还没热。
+            // 🔴 **这一路放行**（别处这是「查找上一个」），但还是让主线程现查一次剪贴板 ——
+            //    「按了没反应」是这功能最不该有的表现，不值得赌那 120ms 够不够。
+            DispatchQueue.main.async { ClipboardJump.jumpIfReallyPath() }
+        }
+
         guard keyCode == settings.jumpKeyCode else { return Unmanaged.passUnretained(event) }
 
         let wanted = CGEventFlags(rawValue: UInt64(settings.jumpModifierFlags))
