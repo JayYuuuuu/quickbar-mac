@@ -154,8 +154,12 @@ enum Photoshop {
     static func syncRemaining() {
         guard isRunning, !busy, !syncing else { return }
         syncing = true
-        Bridge.run(countScript, readOnly: true, timeout: Bridge.quietTimeout, quiet: true) { text in
-            syncing = false
+        // 🔴 **`syncing` 等这一发真回来才放**（`finished`），不在 3 秒超时那一刻放。
+        //    超时只是「不等了」，那一发还挂在 PS 那头。上一版超时就放，下一跳又补发一发 ——
+        //    PS 慢的时候就是一发叠一发（2026-09-14 顾婉娜那台：PS 单个事件偶尔 4~7 秒才回，
+        //    QuickBar 每 4 秒左右补一发，一天超时 150 次）。
+        Bridge.run(countScript, readOnly: true, timeout: Bridge.quietTimeout, quiet: true,
+                   finished: { syncing = false }) { text in
             // 🔴 **存回开跑了就把这一发的结果丢掉**。发出去的时候还没在存，回来时已经在存了 ——
             //    这一发拿到的是**存回之前**的快照，用它去覆盖只会把刚减掉的数又抬回来。
             //    账在存回期间归存回自己管（`report` 拿 PS 关掉文档之后的真实数）。
@@ -512,34 +516,29 @@ extension Photoshop {
         /// 只由只读探测翻（见文件头第二条）。
         private static var mainThreadOnly = false
         private static var thread: Thread?
+        /// `thread` 上还有一发没回来。只在主线程上读写（见 `dispatch`）。
+        private static var threadBusy = false
         private static let runner = Runner()
 
         /// 后台校准那一发用的超时。它没人在等，卡住了就当没问过 —— 但**不能等 20 秒**：
-        /// 那条专用线程是串行的，卡住的一发会把人随后按的 F15 一起堵在后面。
+        /// 人随后按的 F15 要等它放手才知道 PS 是不是真卡住了。
         static let quietTimeout: TimeInterval = 3
 
         /// - Parameter readOnly: 这段脚本改不改东西。只有只读的才允许在「空且无错」时重来一次。
         /// - Parameter timeout: 多久没回话就放弃。默认 20 秒（人按下去等着的那种）。
-        /// - Parameter quiet: 超时不弹框，只记一行日志。**只有没人在等的后台探测才配 true** ——
-        ///   人按了键的动作一律要说话，否则就是「按了没反应」。
+        /// - Parameter quiet: 出什么问题都只记日志、绝不弹框 —— 超时、PS 回错、超时之后才迟到的报错，一律如此。
+        ///   **只有没人在等的后台探测才配 true** —— 人按了键的动作一律要说话，否则就是「按了没反应」。
+        /// - Parameter finished: 脚本**真的**跑完时叫（成败都叫）。`done` 在超时那一刻就会先走，
+        ///   而那一发其实还挂在 PS 那头 —— 要知道「它回没回来」的看这个，别看 `done`。
         static func run(_ source: String, readOnly: Bool = false,
                         timeout: TimeInterval = Bridge.timeout, quiet: Bool = false,
+                        finished: (() -> Void)? = nil,
                         _ done: @escaping (String?) -> Void) {
-            var settled = false
-            let settle: (String?) -> Void = { text in
-                guard !settled else { return }
-                settled = true
-                done(text)
-            }
+            let box = ScriptBox(source: source, readOnly: readOnly, quiet: quiet,
+                                finished: finished, done: done)
             // 绝不「按了没反应」：卡住了也要说一声，并把忙碌状态放回去。
             DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
-                guard !settled else { return }
-                settled = true
-                // 🔴 **那条线程已经废了**：AE 是同步的，卡住的这一发会一直占着它，
-                //    后面每一发都排在它后面（实测过：一发卡住，之后的全不执行）。
-                //    所以把它丢掉换一条新的 —— 不然一次卡死之后这个功能到重启为止都是哑的。
-                //    旧线程等 PS 回话之后会自己空转下去，`settled` 已经是 true，结果会被丢弃。
-                thread = nil
+                guard !box.settled else { return }
                 if quiet {
                     Notify.log("PS 校准超时（\(Int(timeout))s），这一发放弃")
                 } else {
@@ -547,15 +546,34 @@ extension Photoshop {
                                 "它多半正压着一个对话框（存储进度、生成式填充、缺字体提示…），"
                                 + "也可能是第一次用、屏幕上正等你点「允许」。\n处理掉那个框再按一次。")
                 }
-                done(nil)
+                box.settle(nil)
             }
+            dispatch(box)
+        }
 
-            let box = ScriptBox(source: source, readOnly: readOnly, done: settle)
+        /// 🔴 **绝不排在一发还没回来的后面。** AE 是同步的，卡住的那一发会一直占着线程，
+        ///    排在它后面的全不执行（实测过：一发卡住，之后两发一个都没跑）。
+        ///    所以线程上还有活就另起一条，旧的那条 `cancel` 掉 —— 手上那一发回来它就自己退出
+        ///    （2026-09-14 mac24g 实测：忙着时 cancel，活干完线程就结束了）。
+        /// 🔴 上一版是在**超时那一刻**把线程扔掉换新的，扔掉的线程却永远不退出；
+        ///    而后台校准在 PS 慢的时候每 4 秒左右超时一次 —— 2026-09-14 顾婉娜那台
+        ///    QuickBar 开了 5 小时，进程里攒了 156 条线程。
+        private static func dispatch(_ box: ScriptBox) {
             if mainThreadOnly {
                 DispatchQueue.main.async { execOnMain(box) }
-            } else {
-                runner.perform(#selector(Runner.exec(_:)), on: ensureThread(), with: box, waitUntilDone: false)
+                return
             }
+            if threadBusy, let old = thread {
+                old.cancel()
+                // 手上那一发要是恰好刚跑完、run loop 已经睡回 distantFuture，光 cancel 叫不醒它
+                // （实测空闲时 cancel 线程不会退），补一发空活把它叫起来看一眼 `isCancelled`。
+                runner.perform(#selector(Runner.wake), on: old, with: nil, waitUntilDone: false)
+                thread = nil
+            }
+            let t = ensureThread()
+            threadBusy = true
+            box.thread = t
+            runner.perform(#selector(Runner.exec(_:)), on: t, with: box, waitUntilDone: false)
         }
 
         /// 一条自带 run loop 的常驻线程。**run loop 是关键**：没有它 `NSAppleScript`
@@ -584,13 +602,28 @@ extension Photoshop {
 
         fileprivate static func interpret(text: String?, error: NSDictionary?,
                                           box: ScriptBox, fromBackground: Bool) {
+            if fromBackground, box.thread === thread { threadBusy = false }
             if let error {
-                explain(error)
-                box.done(nil)
+                box.finished?()
+                let num = (error[NSAppleScript.errorNumber] as? Int) ?? 0
+                let msg = (error[NSAppleScript.errorMessage] as? String) ?? ""
+                // 🔴 **没人在等的，出什么错都不弹框；超时之后才回来的报错也不弹。**
+                //    上一版只在「超时」那条路上看了 quiet，PS 回错走的是这儿，一律弹框。
+                //    后台校准在人修图时每 2~5 秒问一次 PS，PS 偶尔回一个 -1750「脚本编写部件错误」
+                //    （2 秒后下一发又好了），于是人正在 PS 里干活，弹框一个接一个抢走焦点 ——
+                //    2026-09-14 顾婉娜那台一天 32 个，其中 18 个「没回话」是早就超时放弃了的校准
+                //    在 4 秒里集中迟到回来叠出来的。那一天她一次存回都没按过，框全是后台弹的。
+                if box.quiet || box.settled {
+                    Notify.log("Photoshop AppleScript 失败 \(num)（\(box.quiet ? "后台校准" : "已超时")，不弹框）：\(msg)")
+                } else {
+                    explain(num: num, msg: msg)
+                }
+                box.settle(nil)
                 return
             }
             if let text, !text.isEmpty {
-                box.done(text)
+                box.finished?()
+                box.settle(text)
                 return
             }
             // 「空、而且没有报错」正是那个静默失败的签名。只读的才敢重来。
@@ -600,12 +633,11 @@ extension Photoshop {
                 execOnMain(box)
                 return
             }
-            box.done(text)
+            box.finished?()
+            box.settle(text)
         }
 
-        private static func explain(_ error: NSDictionary) {
-            let num = (error[NSAppleScript.errorNumber] as? Int) ?? 0
-            let msg = (error[NSAppleScript.errorMessage] as? String) ?? ""
+        private static func explain(num: Int, msg: String) {
             Notify.log("Photoshop AppleScript 失败 \(num)：\(msg)")
             switch num {
             case -1743:
@@ -626,12 +658,27 @@ extension Photoshop {
     fileprivate final class ScriptBox: NSObject {
         let source: String
         let readOnly: Bool
-        let done: (String?) -> Void
+        let quiet: Bool
+        let finished: (() -> Void)?
+        private let done: (String?) -> Void
+        /// `done` 已经叫过了（正常回来，或者超时那一刻）。之后再回来的只记日志。只在主线程上读写。
+        private(set) var settled = false
+        /// 这一发跑在哪条专用线程上。回来时拿它判断「是不是现在那条」（见 `Bridge.dispatch`）。
+        var thread: Thread?
 
-        init(source: String, readOnly: Bool, done: @escaping (String?) -> Void) {
+        init(source: String, readOnly: Bool, quiet: Bool,
+             finished: (() -> Void)?, done: @escaping (String?) -> Void) {
             self.source = source
             self.readOnly = readOnly
+            self.quiet = quiet
+            self.finished = finished
             self.done = done
+        }
+
+        func settle(_ text: String?) {
+            guard !settled else { return }
+            settled = true
+            done(text)
         }
     }
 
@@ -645,5 +692,8 @@ extension Photoshop {
                 Bridge.interpret(text: text, error: err, box: box, fromBackground: true)
             }
         }
+
+        /// 空活。只为把睡着的 run loop 叫醒、让它看一眼 `isCancelled`（见 `Bridge.dispatch`）。
+        @objc func wake() {}
     }
 }
