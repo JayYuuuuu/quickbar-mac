@@ -105,17 +105,13 @@ final class MainImagesPill {
     /// 药丸当场淡没，要等下一跳才回来。
     private var hiding = false
 
-    // PS 那头：**有人动了才去问它**（跟访达那头同一套路数，见 `noteUserInput`）
+    // PS 那头：**有人做了「可能改文档数」的操作才去问它**（哪些算、隔多久，全在 `PSSyncPolicy`）
     private var lastPSSync = Date.distantPast
-    /// 上一次输入之后还没向 PS 校准过。
+    /// 上次问过之后，有过一下可能改了文档数的输入（或者刚切到 PS）。
     private var psDirty = true
-    /// 人刚动过：两发之间至少隔这么久。**这是画图时的上限** —— PS 里鼠标事件密集，
-    /// 不设下限就成了往 PS 狂发 AE。
-    private static let psSyncAfterInput: TimeInterval = 2
-    /// 没人动时的兜底。药丸没浮出来的时候问得勤一点（人可能正等它出现）。
-    private static let psSyncIdle: TimeInterval = 10
-    /// 药丸已经在屏幕上、又没人动：再问只是纠正数字，慢一点没人察觉。
-    private static let psSyncShown: TimeInterval = 30
+    /// PS 最前窗口的位置（Quartz 坐标）和读到它的时间。只有「拖」要用它判是不是从窗口外拖进来的；
+    /// 那是一次跨进程 AX 读取，人一直在画的时候每一笔都读不值得，所以留 5 秒。
+    private var psWindowCache: (rect: CGRect?, at: Date) = (nil, .distantPast)
 
     private init() {}
 
@@ -136,7 +132,10 @@ final class MainImagesPill {
             }
         }
         // 宿主窗口一动/一缩/一换，药丸立刻跟过去 —— 等 1.5 秒的心跳会看到它"掉队"。
-        follow.onChange = { [weak self] in self?.reposition() }
+        follow.onChange = { [weak self] in
+            self?.psWindowCache.at = .distantPast   // 窗口动了，下一次「拖」重新读位置
+            self?.reposition()
+        }
         // 存回一张之后数字要立刻变（甚至归零收掉），等下一次心跳会让人以为没生效。
         Photoshop.onStateChanged = { [weak self] in
             guard let self, self.mode == .photoshop else { return }
@@ -205,19 +204,38 @@ final class MainImagesPill {
     ///    8 秒一次，是原来的 1/6。
     /// 🔴 **tap 没在跑时要退回原来的轮询**：人可以在菜单里「暂停触发」，那时候 tap 是关的，
     ///    只靠 8 秒兜底会让药丸慢得像坏了。
-    func noteUserInput() {
+    func noteUserInput(_ input: UserInput) {
         guard enabled else { return }
-        // PS 那头同理：文档数**只可能被人的操作改变**（⌘W 关掉、⌘O 打开、点菜单里的最近文件）。
-        // 没人动就别去问它，动了就尽快问一次 —— 原来纯靠 15 秒兜底，人手动关掉图之后
-        // 药丸还要在那儿挂十几秒（2026-08-26 用户反馈）。
         switch mode {
-        case .finder: selectionDirty = true
-        case .photoshop: psDirty = true
+        case .finder:
+            // 访达里拖一下（框选）也会改选中项，所以这头什么输入都算。
+            selectionDirty = true
+        case .photoshop:
+            // PS 那头：文档数**只可能被人的操作改变**（⌘W 关掉、⌘O 打开、点菜单里的最近文件）。
+            // 动了就尽快问一次 —— 原来纯靠 15 秒兜底，人手动关掉图之后药丸还要挂十几秒（2026-08-26 用户反馈）。
+            // 🔴 **但在画布上画一笔不算**（v1.24.2）：以前每次松开鼠标都算，数位笔修图时就成了
+            //    两三秒问 PS 一次，PS 偶尔回错 / 半天不回，问得越勤撞上得越多（2026-09-14 顾婉娜那台）。
+            //    哪些算见 `PSSyncPolicy.mayChangeDocuments`。
+            guard PSSyncPolicy.mayChangeDocuments(input, psWindow: { psWindowQuartz() }) else { return }
+            psDirty = true
         }
         inputProbe?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.tick() }
         inputProbe = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.inputDebounce, execute: work)
+    }
+
+    /// PS 最前窗口的矩形，换成 Quartz 坐标（跟 `CGEvent.location` 同一套）。拿不到就是 nil。
+    private func psWindowQuartz() -> CGRect? {
+        if Date().timeIntervalSince(psWindowCache.at) < 5 { return psWindowCache.rect }
+        var rect: CGRect?
+        if let r = WindowFollow.frontWindowFrame(of: Photoshop.bundleID),
+           let primary = NSScreen.screens.first(where: { $0.frame.origin == .zero }) ?? NSScreen.main {
+            // `WindowFollow` 给的是 AppKit 坐标（左下原点），翻回 Quartz（左上原点）
+            rect = CGRect(x: r.minX, y: primary.frame.maxY - r.maxY, width: r.width, height: r.height)
+        }
+        psWindowCache = (rect, Date())
+        return rect
     }
 
     /// 当前该贴着谁。
@@ -250,8 +268,10 @@ final class MainImagesPill {
                 mode = .photoshop
                 hide()
                 // 刚切过来：账多半是过期的（人可能在 PS 里自己开了图、或者关掉了几张）。
-                psDirty = false
                 syncPhotoshop()
+                // 🔴 **2 秒后再补一发**：被访达双击 / 拖放唤起时，这一刻图多半还没开完。
+                //    以前靠人接下来画的那一笔带出第二发，现在画的不算输入了（见 `PSSyncPolicy`）。
+                psDirty = true
             }
             tickPhotoshop()
         default:
@@ -265,10 +285,8 @@ final class MainImagesPill {
         // 🔴 **兜底校准不能省**：人在 PS 里自己开图（历史记录 / 双击 / 拖进去）时 PS 早就是
         //    最前台了，激活通知永远不会来 —— 只靠激活那一次校准，药丸还是不出现。
         //    有人动过就走 2 秒那档（关图/开图都是人按出来的），没人动才用长兜底。
-        let gap = psDirty
-            ? Self.psSyncAfterInput
-            : (Photoshop.remaining == 0 ? Self.psSyncIdle : Self.psSyncShown)
-        if Date().timeIntervalSince(lastPSSync) > gap {
+        if PSSyncPolicy.due(sinceLastSync: Date().timeIntervalSince(lastPSSync),
+                            dirty: psDirty, hasRemaining: Photoshop.remaining > 0) {
             psDirty = false
             syncPhotoshop()
         }

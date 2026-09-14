@@ -59,8 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // 「人动了」→ 药丸才去问访达选中了什么（见 MainImagesPill.noteUserInput）；
         // 剪贴板同理，它也只会被人的操作改变（见 ClipboardJump.noteUserInput）。
         // 装在这儿而不是各自的 start() 里，是因为 tap 的回调应该只有一个主人。
-        EventTapService.shared.onUserInput = {
-            MainImagesPill.shared.noteUserInput()
+        EventTapService.shared.onUserInput = { input in
+            MainImagesPill.shared.noteUserInput(input)
             ClipboardJump.noteUserInput()
         }
         EventTapService.shared.onJumpToFinder = { [weak self] in self?.jumpToFinder() }

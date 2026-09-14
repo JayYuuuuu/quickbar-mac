@@ -26,10 +26,10 @@ final class EventTapService {
     /// 跟三格态下的含义完全不同，翻译成格子会把这层区别丢掉。
     var onSwitchWheelDirection: ((Keyboard.SwitchArrow) -> Void)?
 
-    /// 人敲了键或松开了鼠标。药丸拿它当「访达里的选中项可能变了」的信号 ——
-    /// 见 `MainImagesPill.noteUserInput`。**这里不判断前台是谁**：那要读一次
-    /// `NSWorkspace`，而这个回调是每一次按键都会走的，判断留给主线程那边做。
-    var onUserInput: (() -> Void)?
+    /// 人敲了键或松开了鼠标。药丸拿它当「访达里的选中项 / PS 里的文档数可能变了」的信号 ——
+    /// 见 `MainImagesPill.noteUserInput`。**这里不判断前台是谁、也不判断这一下算不算**：
+    /// 那要读 `NSWorkspace` / AX，而这个回调是每一次按键都会走的，判断留给主线程那边做。
+    var onUserInput: ((UserInput) -> Void)?
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -117,19 +117,22 @@ final class EventTapService {
 
         switch type {
         case .keyDown:
-            notifyInput()
+            notifyInput(.key(code: CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode)),
+                             command: event.flags.contains(.maskCommand)))
             return handleKeyDown(event)
         case .rightMouseUp:
-            notifyInput()
+            notifyInput(.mouseUp(down: nil, up: event.location))
             return Unmanaged.passUnretained(event)
         case .leftMouseDown:
+            leftDownAt = event.location
             if handleMouseDown(event) {
                 swallowNextMouseUp = true
                 return nil
             }
             return Unmanaged.passUnretained(event)
         case .leftMouseUp:
-            notifyInput()
+            notifyInput(.mouseUp(down: leftDownAt, up: event.location))
+            leftDownAt = nil
             if swallowNextMouseUp {
                 swallowNextMouseUp = false
                 return nil
@@ -143,10 +146,15 @@ final class EventTapService {
         }
     }
 
+    /// 左键按下那一刻的位置。松开时拿它判「点」还是「拖」（见 `PSSyncPolicy`）。
+    /// **不把拖动事件收进 mask**：数位笔一秒上百个拖动事件，每个都进一次回调不值得。只有 tap 线程读写。
+    private var leftDownAt: CGPoint?
+
     /// 往主线程扔一个「人动了」。回调里只做一次 `async`，够轻。
-    private func notifyInput() {
+    private func notifyInput(_ kind: UserInput.Kind) {
         guard onUserInput != nil else { return }
-        DispatchQueue.main.async { [weak self] in self?.onUserInput?() }
+        let input = UserInput(kind: kind)
+        DispatchQueue.main.async { [weak self] in self?.onUserInput?(input) }
     }
 
     /// 跳转键（默认 ⌘G）。只在确实是文件面板时才吞掉——
