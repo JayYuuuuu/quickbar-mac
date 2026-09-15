@@ -287,7 +287,8 @@ final class MainImagesPill {
         //    有人动过就走 2 秒那档（关图/开图都是人按出来的），没人动才用长兜底。
         if PSSyncPolicy.due(sinceLastSync: Date().timeIntervalSince(lastPSSync),
                             dirty: psDirty, hasRemaining: Photoshop.remaining > 0) {
-            psDirty = false
+            // PS 还在启动时这一发会被跳过（见 `Photoshop.isReady`）：别把「要问」消耗掉，2 秒后再试。
+            if Photoshop.isReady { psDirty = false }
             syncPhotoshop()
         }
         let left = Photoshop.remaining

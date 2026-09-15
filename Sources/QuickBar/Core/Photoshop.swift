@@ -130,6 +130,20 @@ enum Photoshop {
         !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
     }
 
+    /// 在跑、启动完了、而且起来至少 `READY_AFTER` 秒。**没到这一步一个脚本都不编、不发**（v1.24.3）。
+    ///
+    /// 🔴 2026-09-15 顾婉娜那台 QuickBar 崩在苹果的 AppleScript 编译器里（编译时读 PS 的术语表访问了坏地址），
+    ///    就在 PS 进程起来 **4 秒**后。原因没钉死 —— mac24g 上 PS 启动期间连编 356 次没复现 ——
+    ///    但「PS 还没起好就去编」是最可疑的一条；而 mac24g 那一轮实测 PS 起来 **7 秒**后才第一次答得上话。
+    ///    所以留到 15 秒。代价只是刚开 PS 的那十几秒里药丸上的数晚一点校准（丢图进去那条路本来就记了账）。
+    static var isReady: Bool {
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+              app.isFinishedLaunching else { return false }
+        return Date().timeIntervalSince(app.launchDate ?? .distantPast) >= READY_AFTER
+    }
+
+    private static let READY_AFTER: TimeInterval = 15
+
     static var isFrontmost: Bool {
         NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleID
     }
@@ -152,7 +166,7 @@ enum Photoshop {
     /// 🔴 **正在存回时不问**：那一发会排在存回后面，而且存回自己会校准。
     /// 🔴 **静默**：没人在等这一发，超时就当没问过（`quiet: true`），绝不弹框。
     static func syncRemaining() {
-        guard isRunning, !busy, !syncing else { return }
+        guard isReady, !busy, !syncing else { return }
         syncing = true
         // 🔴 **`syncing` 等这一发真回来才放**（`finished`），不在 3 秒超时那一刻放。
         //    超时只是「不等了」，那一发还挂在 PS 那头。上一版超时就放，下一跳又补发一发 ——
@@ -244,6 +258,10 @@ enum Photoshop {
             Notify.problem("Photoshop 没在跑", "先把图丢进 PS，改完再来存回。")
             return
         }
+        guard isReady else {
+            Notify.problem("Photoshop 还在启动", "等它完全打开再来存回。")
+            return
+        }
         guard !busy else { return }
         guard Notify.confirm("把 PS 里打开的图全部存回原位？",
                              "每张都会先拼合图层，再按它自己的原路径覆盖写回，然后关掉。\n"
@@ -271,6 +289,10 @@ enum Photoshop {
     static func revealFront() {
         guard isRunning else {
             Notify.problem("Photoshop 没在跑", "这一项是「把 PS 当前那张所在的文件夹打开」。")
+            return
+        }
+        guard isReady else {
+            Notify.problem("Photoshop 还在启动", "等它完全打开再试一次。")
             return
         }
         Bridge.run(infoScript, readOnly: true) { text in
@@ -307,6 +329,10 @@ enum Photoshop {
         guard !busy else { return false }
         guard isRunning else {
             Notify.problem("Photoshop 没在跑", "「存回原位」是把 PS 当前那张按原路径覆盖存回。")
+            return false
+        }
+        guard isReady else {
+            Notify.problem("Photoshop 还在启动", "等它完全打开再按一次。")
             return false
         }
         setBusy(true)
@@ -596,7 +622,8 @@ extension Photoshop {
 
         fileprivate static func execOnMain(_ box: ScriptBox) {
             var err: NSDictionary?
-            let text = NSAppleScript(source: box.source)?.executeAndReturnError(&err).stringValue
+            let text = CompiledScript.get(box.source, target: Photoshop.bundleID)?
+                .executeAndReturnError(&err).stringValue
             interpret(text: text, error: err, box: box, fromBackground: false)
         }
 
@@ -687,7 +714,8 @@ extension Photoshop {
     fileprivate final class Runner: NSObject {
         @objc func exec(_ box: ScriptBox) {
             var err: NSDictionary?
-            let text = NSAppleScript(source: box.source)?.executeAndReturnError(&err).stringValue
+            let text = CompiledScript.get(box.source, target: Photoshop.bundleID)?
+                .executeAndReturnError(&err).stringValue
             DispatchQueue.main.async {
                 Bridge.interpret(text: text, error: err, box: box, fromBackground: true)
             }

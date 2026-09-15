@@ -285,6 +285,18 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   改完跑 `./Packaging/VerifyPSSyncPolicy.sh`（22 条断言 + 新旧规则同一段模拟输入的对比）。
   ⚠️ **收益取决于怎么修图**：模拟 10 分钟，拖着画为主 204 → 45 次；一下一下点为主（污点修复）204 → 194 次，
   几乎没省 —— 画布上点一下和点标签页上的 × 从事件上分不开。这是模拟，不是真人数据。
+- 🔴 **崩溃：QuickBar 死在苹果的 AppleScript 编译器里**（2026-09-15 09:02:43 顾婉娜那台，1.24.2，SIGSEGV）。
+  崩溃线程是 PS 专用线程，栈顶 `ASCompile → TASParser::Parse → TASLexer::UseEvent`（编译时读 PS 术语表访问坏地址），
+  **就在 PS 进程起来 4 秒后**；同一时刻主线程也在 AppleScript 里（释放一个访达脚本，卡在 `AppleScriptLocker` 的锁上）。
+  原因**没钉死**：mac24g 上后台拉起 PS、启动期间用 osascript 连编 356 次，没崩；那一轮 PS 起来 7 秒后才第一次答得上话。
+  v1.24.3 两条都做：① `Photoshop.isReady` —— 启动完且起来满 15 秒之前一个脚本都不编（后台校准跳过、不消耗「要问」，
+  人按键弹「还在启动」）；② `Core/CompiledScript.swift` —— PS 和访达的脚本**每条线程只编一次**、目标换进程就重编，
+  不再每问一次现编一次。实测编一次反复用 50.6ms/次 vs 每次现编 57.5ms/次（System Events，执行占大头），
+  图的不是快，是编译次数少几个数量级。**效果是推断**，崩溃复现不出来。
+  ⚠️ 远程排查崩溃：`~/Library/Logs/DiagnosticReports/QuickBar-*.ips` 是两段 JSON（第一行头、其余是正文），
+  用 `/usr/bin/python3` 解 `threads[].frames` 看每条线程在干嘛 —— **只看崩溃线程会漏掉另一条线程同时在做的事**。
+  ⚠️ 2026-09-15 mac24g 早上 09:37 自己重启过一次：那是 **macOS 26.6.2 → 27.0 自动升级**（softwareupdated 09:34 在备升级，
+  重启后 `sw_vers` 变了），不是在上面拉 PS 做测试弄的。ssh 断了先查 `sysctl kern.boottime` / `sw_vers`，别急着认领。
   ⚠️ ssh 进去的进程**合成不了鼠标事件**（`CGPreflightPostEventAccess` 为 false，光标不动、HIDIdleTime 不归零），
   而 mac24g 常年锁屏（前台是 loginwindow），所以这类「真 App + 真输入」的测法在构建机上做不了。
 - **远程看 AE 往返的真实耗时**：`log show --info --debug --predicate 'subsystem == "com.apple.appleevents"'`

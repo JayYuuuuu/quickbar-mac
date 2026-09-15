@@ -107,7 +107,7 @@ final class FinderService {
         end tell
         """
         var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return ([], false) }
+        guard let script = CompiledScript.get(source, target: "com.apple.finder") else { return ([], false) }
         let result = script.executeAndReturnError(&error)
         guard error == nil, let text = result.stringValue else { return ([], false) }
         let lines = text.components(separatedBy: "\n")
@@ -137,7 +137,7 @@ final class FinderService {
         end tell
         """
         var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return nil }
+        guard let script = CompiledScript.get(source, target: "com.apple.finder") else { return nil }
         let result = script.executeAndReturnError(&error)
         if error != nil { return nil }
         guard let text = result.stringValue, !text.isEmpty else { return nil }
