@@ -208,7 +208,10 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   （`Core/PillPlacement.swift`，改完跑 `./Packaging/VerifyPillPlacement.sh`）。障碍物只算访达自己排在宿主前面的窗口；
   PS 的窗口列表没量过，不躲。
   ⚠️ 远程造进度框：`tell application "Finder" to duplicate` 一个 4 万个小文件的目录到 `/tmp`，约 10 秒；
-  在 mac48g 上往 `-nobrowse` 挂的磁盘映像里拷过一次，之后那台访达的 AppleScript 全部超时（那台还锁着屏，原因没钉死），别照着做。
+  ⚠️ **mac48g 上从 ssh 给访达发脚本一律超时，不是访达卡了**：那台从没批过「ssh 控制访达」，每发一次系统就弹一个授权框等人点，
+  没人点就超时、框跟着消失 —— 事后去屏幕上看是**什么都没有**的（2026-09-17 一度误判成拷磁盘映像把访达弄卡了，重启访达也没用）。
+  日志里认法：`tccd` 的 `Handling access request: kTCCServiceAppleEvents … com.apple.finder … authValue: 1`。
+  当天 14:47:33 那一次被批准了（日志 `ACCESS GRANTED`，看不出是谁点的），之后就正常了。
   读 AX：mac24g 上借 System Events 能读；**mac48g 上 System Events 返回的是空列表**（访达明明开着窗口），
   拿空当「没有窗口」就错了。最稳的是把要测的产品代码编成一个 bundle id / 证书都跟 QuickBar 一样的小 App，
   `open -n -g -W` 跑，辅助功能授权能继承过来（2026-09-17 实测 `AXIsProcessTrusted` 为真）。
