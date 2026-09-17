@@ -8,6 +8,8 @@
 #   ssh mac24g 'cd ~/quickbar-mac && ./Packaging/RenderWheel.sh'   # 出图在 /tmp/wheel/
 #   scp mac24g:'/tmp/wheel/*.png' .                                # 取回来看
 set -euo pipefail
+# 同 build.sh：Xcode 许可没同意时 swift / swiftc 一律拒跑，命令行工具那套不受影响
+[ -d /Library/Developer/CommandLineTools ] && export DEVELOPER_DIR="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
 cd "$(dirname "$0")/.."
 
 OUT="${1:-/tmp/wheel}"

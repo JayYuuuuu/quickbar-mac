@@ -581,6 +581,7 @@ final class MainImagesPill {
     ///
     /// 坐标换算在 `WindowFollow` 里做（AX 是主屏左上角原点、y 向下）；这儿只管贴哪个角，
     /// 最后一定要夹回可见区域 —— 窗口被拖到屏幕边上时，药丸会算到屏幕外面去。
+    /// 宿主前面还浮着同一应用的别的窗口（访达的拷贝进度框）就躲开，见 `PillPlacement`。
     private func place(_ panel: NSPanel) {
         let size = panel.frame.size
         var origin: NSPoint
@@ -595,11 +596,12 @@ final class MainImagesPill {
         } else {
             origin = NSPoint(x: 200, y: 200)
         }
-        // 夹回它所在那块屏幕的可见区域
+        // 夹回它所在那块屏幕的可见区域，顺手躲开挡在宿主前面的窗口
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: origin.x, y: origin.y)) } ?? NSScreen.main
         if let vf = screen?.visibleFrame {
-            origin.x = min(max(origin.x, vf.minX + 8), vf.maxX - size.width - 8)
-            origin.y = min(max(origin.y, vf.minY + 8), vf.maxY - size.height - 8)
+            origin = PillPlacement.origin(for: CGRect(origin: origin, size: size),
+                                          avoiding: follow.obstacles,
+                                          within: vf.insetBy(dx: 8, dy: 8))
         }
         // 没挪窝就别叫 setFrameOrigin：拖窗时通知一秒好几十条，每条都重设一次
         // 会让这颗浮窗自己抖起来。

@@ -17,9 +17,43 @@ BUILD_NUMBER="$(date +%Y%m%d%H%M)"
 SIGN_ID="${QUICKBAR_SIGN_ID:-LocalShot Internal Code Signing}"
 APP="dist/QuickBar.app"
 
-echo "==> 编译 universal 二进制"
-swift build -c release --arch arm64 --arch x86_64
-BINARY="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/QuickBar"
+# 🔴 不走 SwiftPM，用命令行工具的 swiftc 直接编，钉在保留的 SDK 26.5 上（2026-09-17 改）。
+#    mac24g 自动升级到 macOS 27 / Xcode 27 之后，Xcode 许可要 sudo 重新同意 ——
+#    没同意之前 `swift build`、`xcrun`、连 `lipo` 这类 /usr/bin 下的转发壳子一律报
+#    "You have not agreed to the Xcode license"。换成命令行工具那套：它的 SwiftPM
+#    连 Package.swift 都链接不过（PackageDescription 符号缺失），swiftc 本身是好的。
+#    这跟 PortManager 在 mac48g 上撞到的是同一次升级，那边也是这么绕的。
+#    Package.swift 留着给有完整 Xcode 的机器和编辑器用，这里不读它 —— 改编译参数两边都要改。
+#    x86_64 那半会报一句 libswiftCompatibilityPacks.a 缺 x86_64 被忽略：部署目标 13 用不到它，链接照样过。
+export DEVELOPER_DIR="${QUICKBAR_DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
+SDK="${QUICKBAR_SDK:-$DEVELOPER_DIR/SDKs/MacOSX26.5.sdk}"
+[ -d "$SDK" ] || { echo "找不到 SDK：$SDK（QUICKBAR_SDK 可以指定别的）" >&2; exit 1; }
+
+echo "==> 编译 universal 二进制（$(basename "$SDK")）"
+OUT=".build/direct"
+mkdir -p "$OUT"
+SOURCES=()
+while IFS= read -r f; do SOURCES+=("$f"); done < <(find Sources/QuickBar -name '*.swift' | sort)
+for ARCH in arm64 x86_64; do
+  rm -f "$OUT/QuickBar-$ARCH"      # 编失败时别让上一次的产物冒充这一次的
+  "$DEVELOPER_DIR/usr/bin/swiftc" -O -wmo -swift-version 5 -module-name QuickBar \
+      -sdk "$SDK" -target "$ARCH-apple-macosx13.0" \
+      -Xclang-linker -isysroot -Xclang-linker "$SDK" \
+      "${SOURCES[@]}" -o "$OUT/QuickBar-$ARCH" 2>&1 | grep -v "libswiftCompatibilityPacks.a" || true
+  [ -x "$OUT/QuickBar-$ARCH" ] || { echo "$ARCH 编译失败" >&2; exit 1; }
+done
+BINARY="$OUT/QuickBar"
+lipo -create "$OUT/QuickBar-arm64" "$OUT/QuickBar-x86_64" -output "$BINARY"
+# 🔴 链接器记下的「SDK 版本」必须是真用的那个。系统按它决定给不给这个程序新外观
+#    （低于 26 会被当成老程序套兼容模式，毛玻璃、控件长相都可能变）。
+#    swiftc 只把 --sysroot 传给链接器，链接器不认它，记下的是 13.0 或默认 SDK 的 27.0
+#    （同一天实测两种都出现过），所以上面要补 -isysroot，这里再验一遍。
+WANT_SDK="$(/usr/libexec/PlistBuddy -c 'Print :Version' "$SDK/SDKSettings.plist")"
+if vtool -show-build "$BINARY" | awk '$1 == "sdk" {print $2}' | grep -vqx "$WANT_SDK"; then
+  echo "链接进去的 SDK 版本不是 $WANT_SDK：" >&2
+  vtool -show-build "$BINARY" >&2
+  exit 1
+fi
 
 echo "==> 组装 .app"
 rm -rf "$APP" dist/QuickBar.zip

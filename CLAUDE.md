@@ -8,8 +8,18 @@ macOS 快捷条。源码 devbox `/workspace/quickbar-mac`，公开仓库 `JayYuu
 | 角色 | 机器 | 说明 |
 |---|---|---|
 | 源码 | devbox `/workspace/quickbar-mac` | 只编辑源码/文档/git。**Linux 出不了 `.app`，编译必须去 Mac** |
-| 构建机 | `ssh mac24g` → `~/quickbar-mac` | macOS 26 / Swift 6.3 / 完整 Xcode，钥匙串里有签名证书 |
+| 构建机 | `ssh mac24g` → `~/quickbar-mac` | macOS 27 / 命令行工具 Swift 6.4 + 保留的 SDK 26.5，钥匙串里有签名证书 |
 | 运行机 | 同一台 mac24g | ⚠️ 构建机和用户日常在用的机器是同一台，装调试版前先想清楚 |
+
+🔴 **构建不走 SwiftPM**（2026-09-17 起）。mac24g 自动升到 macOS 27 / Xcode 27 之后 Xcode 许可要 sudo 重新同意，
+没同意时 `swift build`、`xcrun`、`lipo`、`swift` 一律报 "You have not agreed to the Xcode license"；
+命令行工具自带的 SwiftPM 又连 `Package.swift` 都链接不过。所以 `build.sh` 跟 PortManager 一样
+用命令行工具的 `swiftc` 直接编两遍再 `lipo`，钉 SDK 26.5（`Package.swift` 不再参与构建，改编译参数两边都要改）。
+- 🔴 **链接时要补 `-Xclang-linker -isysroot`**：swiftc 只传 `--sysroot`，链接器不认，二进制里记的 SDK 版本
+  会变成 13.0 或 27.0（实测两种都出现过）。系统按这个数决定给不给新外观，`build.sh` 里有一道校验拦着。
+- `Packaging/` 下的验证 / 渲染脚本也都默认切到命令行工具，手动跑 `swiftc` 时记得带 `DEVELOPER_DIR=/Library/Developer/CommandLineTools`。
+- x86_64 那半会报 `libswiftCompatibilityPacks.a` 缺 x86_64 被忽略，部署目标 13 用不到，链接照样过。
+  **Intel 上跑没实测过**（手边没有 Intel 机器 / Rosetta），arm64 那半在 mac48g 上启动过。
 
 ```bash
 ./release.sh 1.5.0            # devbox 一条命令：同步→Mac 构建签名→取回→发 GitHub Release
@@ -189,6 +199,19 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
      `CGWindowListCopyWindowInfo` 看窗口在不在屏幕上（`layer=3` 就是 floating）。
      屏幕截不到（`screencapture` 在 ssh 会话里报 could not create image from display）。
 - `WindowFollow.swift`（v1.14.0）让药丸贴着宿主窗口走。
+  🔴 **访达的宿主不是「当前窗口」**（v1.24.4）。拷贝 / 移动时冒出来的进度框也是访达的窗口，
+  一出来就抢成 AXFocusedWindow，药丸于是贴进 404×88 的进度框右下角、压住进度条（2026-09-17 用户实拍）。
+  两种窗口子角色都是 `AXStandardWindow`，分得开的是 **AXIdentifier：浏览窗口 `FinderWindow`、进度框 `Progress`**
+  （mac24g / macOS 27 实测；AX 窗口列表里还有一个 id 为空、铺满全屏的桌面窗口，排在最后）。
+  现在宿主只认 `FinderWindow`，认不出退回「不是 `Progress` 的第一个」。
+  🔴 **贴对了还要躲**：进度框浮在浏览窗口右下角上时，药丸挪到四个方向里离原位最近的空位
+  （`Core/PillPlacement.swift`，改完跑 `./Packaging/VerifyPillPlacement.sh`）。障碍物只算访达自己排在宿主前面的窗口；
+  PS 的窗口列表没量过，不躲。
+  ⚠️ 远程造进度框：`tell application "Finder" to duplicate` 一个 4 万个小文件的目录到 `/tmp`，约 10 秒；
+  在 mac48g 上往 `-nobrowse` 挂的磁盘映像里拷过一次，之后那台访达的 AppleScript 全部超时（那台还锁着屏，原因没钉死），别照着做。
+  读 AX：mac24g 上借 System Events 能读；**mac48g 上 System Events 返回的是空列表**（访达明明开着窗口），
+  拿空当「没有窗口」就错了。最稳的是把要测的产品代码编成一个 bundle id / 证书都跟 QuickBar 一样的小 App，
+  `open -n -g -W` 跑，辅助功能授权能继承过来（2026-09-17 实测 `AXIsProcessTrusted` 为真）。
   🔴 **移动/缩放通知是注册在那个窗口元素上的，不是应用上** —— 人 ⌘N 开个新窗口，
   旧注册还挂在旧窗口上，表现是「有时候跟、有时候不跟」。所以应用元素上还得盯
   `focusedWindowChanged`，一变就把窗口那几条重新挂过去。
