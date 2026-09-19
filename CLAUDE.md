@@ -195,8 +195,8 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   🔴 **心跳一直跑，别靠 `didActivateApplication` 启动轮询** —— Finder 本来就在最前时（自动更新后
      重启、开机自启）那个通知永远不来，功能从此静默失效。心跳自己看 `frontmostApplication`，
      不在 Finder 时只读一个属性就返回。
-  🔴 这台机器上 **`log show` 拿不到 NSLog**（远程排查时别指望它），验证靠临时写 `/tmp` 文件 +
-     `CGWindowListCopyWindowInfo` 看窗口在不在屏幕上（`layer=3` 就是 floating）。
+  🔴 `log show` 里 NSLog 的正文是 `<private>`（见下文「远程排查看 `~/Library/Logs/QuickBar.log`」），
+     验证靠临时写 `/tmp` 文件 + `CGWindowListCopyWindowInfo` 看窗口在不在屏幕上（`layer=3` 就是 floating）。
      屏幕截不到（`screencapture` 在 ssh 会话里报 could not create image from display）。
 - `WindowFollow.swift`（v1.14.0）让药丸贴着宿主窗口走。
   🔴 **访达的宿主不是「当前窗口」**（v1.24.4）。拷贝 / 移动时冒出来的进度框也是访达的窗口，
@@ -208,10 +208,9 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   （`Core/PillPlacement.swift`，改完跑 `./Packaging/VerifyPillPlacement.sh`）。障碍物只算访达自己排在宿主前面的窗口；
   PS 的窗口列表没量过，不躲。
   ⚠️ 远程造进度框：`tell application "Finder" to duplicate` 一个 4 万个小文件的目录到 `/tmp`，约 10 秒；
-  ⚠️ **mac48g 上从 ssh 给访达发脚本一律超时，不是访达卡了**：那台从没批过「ssh 控制访达」，每发一次系统就弹一个授权框等人点，
-  没人点就超时、框跟着消失 —— 事后去屏幕上看是**什么都没有**的（2026-09-17 一度误判成拷磁盘映像把访达弄卡了，重启访达也没用）。
-  日志里认法：`tccd` 的 `Handling access request: kTCCServiceAppleEvents … com.apple.finder … authValue: 1`。
-  当天 14:47:33 用户在屏幕上点了允许（日志 `ACCESS GRANTED`），之后就正常了。
+  ⚠️ **从 ssh 给访达发脚本超时，先查是不是在等「允许控制访达」授权，别当成访达卡了**：没批过的机器每发一次就弹一个
+  授权框等人点，没人点就超时、框跟着消失 —— 事后去屏幕上看是**什么都没有**的。mac48g 2026-09-17 已批过。
+  日志里认法：`tccd` 的 `Handling access request: kTCCServiceAppleEvents … com.apple.finder … authValue: 1`（批了之后是 `ACCESS GRANTED`）。
   读 AX：mac24g 上借 System Events 能读；**mac48g 上 System Events 返回的是空列表**（访达明明开着窗口），
   拿空当「没有窗口」就错了。最稳的是把要测的产品代码编成一个 bundle id / 证书都跟 QuickBar 一样的小 App，
   `open -n -g -W` 跑，辅助功能授权能继承过来（2026-09-17 实测 `AXIsProcessTrusted` 为真）。
@@ -367,7 +366,7 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   存完就关，关掉 `document i` 之后 1…i-1 下标不动。正着走漏一半；
   写成 `repeat while (count of documents) > 0` 则会被「跳过但不关」的文档卡成死循环。
 - 🔴 **药丸的数字只记账是错的**（v1.18.0 修）。原来 `Photoshop.remaining` 只在两处变：
-  经药丸丢图进 PS（`MainImages.swift:68` 是**唯一**的 `rememberOpened` 调用点）、以及存回一张之后
+  经药丸丢图进 PS（`MainImages.swift` 里是**唯一**的 `rememberOpened` 调用点）、以及存回一张之后
   拿 PS 回的数校准。**人自己在 PS 里开图 / 关图，QuickBar 一概不知道** —— 于是
   「打开了图药丸不出现」「PS 里只开着 1 张、药丸写着还剩 2 张」（2026-08-26 用户拍到），
   日志里那个数从上一次存回之后 19 分钟纹丝不动。
