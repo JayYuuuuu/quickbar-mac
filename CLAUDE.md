@@ -1,5 +1,7 @@
 # QuickBar — 项目工作指南
 
+> 🔴 **mac48g 升到 macOS 27 后必须用 26.5 SDK 编**（默认 27 SDK 缺 SwiftUI 宏插件，报 `SwiftUIMacros not found`，不是代码问题）：`SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build …`。细节见 `/workspace/CLAUDE.md`。
+
 macOS 快捷条。源码 devbox `/workspace/quickbar-mac`，公开仓库 `JayYuuuuu/quickbar-mac`。
 面向用户的说明在 [`README.md`](README.md)，这里只放**开发时会踩的坑**。
 
@@ -108,6 +110,8 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   归一化就够了），`suffix` 是唯一的自愈路径。
 - 🔴 **绝不「点了没反应」**：目标没了就退到还在的上一层并说清原因；通知没授权就退回弹框
   （静悄悄地降级 = 人以为打开的是 A、其实是 B）。
+- 🔴 **Windows 上同一条链接由 PortManager-win 接**（2.19.1 起，`PortManager-win/electron/reveal.js`）：它把
+  `quickbar://` 登记到自己名下，`/Volumes/<共享>` 换成映射盘符 / UNC 开资源管理器。**改 reveal 的参数或兜底顺序两边一起改。**
 - 服务端那半边：路径由 `api/material-folder.js` 从盘上**读**出来（容器 `/nas/<共享>` ↔
   Mac `/Volumes/<共享>`，只差一个前缀），不是拼的。改那边先读 AI 电商内容助手仓库的
   `docs/rules/采集-店铺与详情浏览.md` 与 `api/material-folder.js` 的文件头。
@@ -139,7 +143,14 @@ merge 是「默认值垫底、磁盘那份盖上去」，于是 `settings.json` 
   **两种都表现为「它很随机」** —— 最难从反馈里查回来的那一类。
 - 服务端那半边：`ai-ecommerce/dipdip-playbook.html` 的视频卡片上加了「在访达打开」
   （走 `quickbar://`，鼠标入口），「复制路径」降为次按钮留着兜底。
-  `video-material.html` / `video-launch.html` 上也有 `mac_path`，**还没加**。
+  `video-material.html`（按产品找视频）/ `video-launch.html`（视频上架看板）2026-09-24 也加上了「打开文件夹」。
+
+## 操作日志回传（2026-09-30）
+
+`Core/AppLog.swift`：收到的每条 `quickbar://` 链接（含 2 秒内被去重跳过的）、送 PS 每一条没打开的分支、PS 存回、所有弹框，
+写本机 `Application Support/QuickBar/applog/`，每分钟传 ai-ecommerce `/api/app-logs/ingest`，网站 `/app-logs`（管理员）查，存 30 天。
+身份用本机 PortManager 的 `/pm/whoami` 证明（**不用**素材那把只读 key）；没 PortManager 就一直留在本机（最多 5MB）。
+帧选送 PS 的链接带 `trace=`，这边记同一个，两边能串起来。档案：ai-ecommerce `docs/modules/app-logs.md`。
 
 ## 主图丢进 PS / `~/最近素材批次`（v1.9.0，浮窗 v1.10.0）
 

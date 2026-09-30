@@ -24,15 +24,22 @@ enum URLScheme {
 
     static func handle(_ url: URL) {
         guard url.scheme?.lowercased() == scheme else { return }
-        let key = url.absoluteString
-        if key == lastURL, Date().timeIntervalSince(lastAt) < 2 { return }
-        lastURL = key; lastAt = Date()
-
         // `quickbar://reveal?…` 里动作名落在 host 上；写成 `quickbar:reveal?…` 时落在 path 上，两处都认。
         let raw = url.host ?? url.path
         let action = raw.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let q: (String) -> String = { name in items.first { $0.name == name }?.value ?? "" }
+        let paths = items.filter { $0.name == "path" }.compactMap(\.value)
+
+        let key = url.absoluteString
+        if key == lastURL, Date().timeIntervalSince(lastAt) < 2 {
+            AppLog.log("url.received", paths.joined(separator: "\n"), trace: q("trace"),
+                       detail: ["action": action, "dup": "1"])
+            return
+        }
+        lastURL = key; lastAt = Date()
+        AppLog.log("url.received", paths.joined(separator: "\n"), trace: q("trace"),
+                   detail: ["action": action, "paths": "\(paths.count)"])
 
         switch action {
         case "reveal", "open":
@@ -40,7 +47,7 @@ enum URLScheme {
         case "ps":
             // 把这些目录里的主图丢进 Photoshop（`path` 可以出现多次）。挑图口径见 MainImages。
             MainImages.openInPhotoshop(items.filter { $0.name == "path" }.compactMap(\.value).filter { !$0.isEmpty }
-                                            .compactMap { allowed($0)?.path })
+                                            .compactMap { allowed($0)?.path }, trace: q("trace"))
         default:
             NSLog("[QuickBar] 不认识的 quickbar:// 动作：\(action)")
         }

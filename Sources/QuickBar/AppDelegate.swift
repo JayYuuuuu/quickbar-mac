@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.setActivationPolicy(.accessory)
 
         MainMenu.install()
+        AppLog.shared.start()   // 操作日志回传（排查问题用，见 Core/AppLog.swift）
 
         _ = Store.shared
         quickBar = QuickBarPanel()
@@ -104,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationWillTerminate(_ notification: Notification) {
         Store.shared.saveNow()
         EventTapService.shared.stop()
+        AppLog.shared.quit()
     }
 
     // MARK: - 通知

@@ -343,6 +343,7 @@ enum Photoshop {
         let lines = out.components(separatedBy: "\n")
         guard lines.first == "OK" else {
             let msg = lines.count > 2 ? lines[2] : out
+            AppLog.log("ps.saveBack", path.isEmpty ? name : path, ok: false, err: msg)
             Notify.problem("这张没能存回去", "\(name)：\(msg)\n原图没有被改动。")
             return
         }
@@ -352,6 +353,7 @@ enum Photoshop {
         zeroBySave = true
         setRemaining(Int(lines.count > 1 ? lines[1].trimmingCharacters(in: .whitespaces) : "") ?? (remaining - 1))
         Notify.log("存回 \(path.isEmpty ? name : path)，PS 里还剩 \(remaining) 张")
+        AppLog.log("ps.saveBack", path.isEmpty ? name : path, detail: ["remaining": "\(remaining)"])
     }
 
     /// `infoScript` 回来的五行。

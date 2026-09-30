@@ -13,6 +13,7 @@ enum Notify {
     ///    就是这个软件最不该有的那种静默失败。
     static func problem(_ title: String, _ body: String) {
         log("\(title)：\(body)")
+        AppLog.log("problem", title, ok: false, err: body)
         guard Bundle.main.bundleIdentifier != nil else { return }
         DispatchQueue.main.async { alert(title, body) }
     }

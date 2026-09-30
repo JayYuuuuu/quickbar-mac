@@ -61,19 +61,23 @@ enum MainImages {
     ///
     /// - Parameter allowLooseFolder: 人**主动**点出来的动作（菜单栏、`quickbar://ps`）传 true；
     ///   药丸那条自动浮出的路要看人是不是真的选中了它，见 `pick`。
-    static func openInPhotoshop(_ paths: [String], allowLooseFolder: Bool = true) {
+    static func openInPhotoshop(_ paths: [String], allowLooseFolder: Bool = true, trace: String = "") {
+        let what = paths.joined(separator: "\n")
         guard !paths.isEmpty else {
+            AppLog.log("ps.open", "", ok: false, err: "没给路径（或路径不在 /Volumes / 家目录下）", trace: trace)
             Notify.problem("不知道要开哪些图", "先在 Finder 里选中图片、或者装着图的文件夹，再来一次。")
             return
         }
         let picked = pick(from: paths, allowLooseFolder: allowLooseFolder)
         guard !picked.isEmpty else {
+            AppLog.log("ps.open", what, ok: false, err: "这儿没找到图", trace: trace)
             Notify.problem("这儿没找到图",
                            "认的是选中的图片本身、商品文件夹里的「主图」，或者直接摆着图的文件夹。"
                            + "\n（文件夹里的图不往下递归找，只看这一层。）")
             return
         }
         guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: photoshopBundleID) else {
+            AppLog.log("ps.open", what, ok: false, err: "没找到 Photoshop（\(photoshopBundleID)）", trace: trace)
             Notify.problem("没找到 Photoshop", "这台机器上没装，或者装的版本换了 bundle id（当前认的是 \(photoshopBundleID)）。")
             return
         }
@@ -84,11 +88,18 @@ enum MainImages {
                                  + (picked.isMainImages
                                     ? "想少开一点：在 Finder 里只选中要处理的那几个商品文件夹。"
                                     : "想少开一点：在 Finder 里只选中要改的那几张。"),
-                                 ok: "全部打开") else { return }
+                                 ok: "全部打开") else {
+                AppLog.log("ps.open", what, ok: false, err: "人在「要一次打开 \(images.count) 张吗」那里点了取消", trace: trace)
+                return
+            }
         }
         let cfg = NSWorkspace.OpenConfiguration()
         cfg.activates = true
+        let started = Date()
         NSWorkspace.shared.open(images, withApplicationAt: app, configuration: cfg) { _, error in
+            AppLog.log("ps.open", images.map(\.path).joined(separator: "\n"), ok: error == nil,
+                       ms: Date().timeIntervalSince(started) * 1000, err: error?.localizedDescription ?? "", trace: trace,
+                       detail: ["images": "\(images.count)"])
             DispatchQueue.main.async {
                 if let error {
                     Notify.problem("Photoshop 没能打开这些图", error.localizedDescription)
